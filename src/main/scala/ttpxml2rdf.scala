@@ -16,6 +16,7 @@ import com.hp.hpl.jena.vocabulary.DC_11
 import com.hp.hpl.jena.vocabulary.RDFS
 import com.bizo.mighty.csv.CSVDictReader
 import scala.xml.parsing.XhtmlEntities
+import com.hp.hpl.jena.vocabulary.DCTerms
 
 object TTPXML2RDF extends CSV2RDF {
 
@@ -49,11 +50,56 @@ object TTPXML2RDF extends CSV2RDF {
     ptypes.foreach(ptype => p2.addProperty(practitioner_type, ptype))
   })
   
-  def process(content : String) : String = {
-    if (content.toLowerCase().startsWith("lakilinkki|")) content.substring(15)+"/"+content.substring(11,15)
-    else if (content=="NAMESPACE") "Oikeustiede"    
+  private val fields = """(?s)\|(.*?)=([^\|]+)""".r
+
+  def process(form : String, title : String, content : String) : Unit = {
+    var ct = content
+    ct = ct.replaceAll("""\[\[.*?\|(.*)\]\]""", """\1""")
+    ct = ct.replaceAll("""\[\[Oikeustiede:(.*?)\]\]""","""\1""")
+    ct = ct.replaceAll("""\[\[(.*?)\]\]""", """\1""")
+    val r = I(ns+"_"+encode(title),Map("fi"->title),SKOS.Concept)
+    form match {
+      case "Käsite" =>
+        for (mt <- fields.findAllMatchIn(ct)) {
+          val tag = mt.group(1).toLowerCase()
+          val content = mt.group(2)
+          tag match {
+            case "selite_fi" => r.addProperty(RDFS.comment,content,"fi")
+            case "määritelmä_fi" => r.addProperty(DCTerms.description,content,"fi")
+            case "logotiedosto" | "logolinkki" | "tarkistettu" =>
+            case u => //println(u)
+          }
+        }            
+      case "Lähikäsite" => for (mt <- fields.findAllMatchIn(ct)) {
+          val tag = mt.group(1).toLowerCase()
+          val content = mt.group(2)
+          tag match {
+            case "käsite" => 
+              val n2 = content.replaceFirst("^Oikeustiede:","")
+              r.addProperty(SKOS.related,I(ns+"_"+encode(n2),Map("fi"->n2),SKOS.Concept))
+            case u => //println(u)
+          }
+      }
+      case "Liittyvä nimitys" => for (mt <- fields.findAllMatchIn(ct)) {
+          val tag = mt.group(1).toLowerCase()
+          val content = mt.group(2)
+          val lang = ""
+          tag match {
+            case "kieli" => 
+            case "nimitys" => 
+            case u => //println(u)
+          }
+      }
+      case u => println("Unknown form: "+u)      
+    }
+    
+  }
+  
+  def process2(form : String, content : String) : String = {
+    if (form.toLowerCase()=="lakilinkki|") content.substring(4)+"/"+content.substring(0,4)
+    else if (form=="NAMESPACE") "Oikeustiede"    
     else {
-     println("Unknown subtag: "+content)
+     println("Unknown subtag: "+form)
      content
     } 
   }
@@ -62,12 +108,10 @@ object TTPXML2RDF extends CSV2RDF {
     val xml = new XMLEventReader(Source.fromFile("Tieteen+termipankki-20150115114146.xml"))
     var title = ""
     var intext = false
-    val fields = """(?s)\|(.*?)=([^\|]+)""".r
     var text = ""
     while (xml.hasNext) xml.next match {
       case EvElemStart(_,"title", _, _) => 
         title = xml.next.asInstanceOf[EvText].text.replaceFirst("^Oikeustiede:","")
-        println(title)
       case EvElemStart(_,"text", _, _) =>
         intext = true
         text+= xml.next.asInstanceOf[EvText].text
@@ -76,31 +120,24 @@ object TTPXML2RDF extends CSV2RDF {
         var i = 0
         var cs : Seq[String] = Seq.empty
         var ct = ""
+        var form = ""
         while (i<text.length) {
           if (text(i)=='{' && i+1<text.length && text(i+1)=='{') {
            cs = cs :+ ct
            ct=""
            depth+=1
-           i+=1
+           i+=2
+           form = ""
+           while(text(i)!='\n' && text(i)!='|' && text(i)!='}') {
+             form+=text(i)
+             i+=1
+           }
+           i-=2
           } else if (text(i)=='}' && i+1<text.length && text(i+1)=='}') {
             val dct = ct
-            if (depth==1) {
-              ct = ct.replaceAll("""\[\[.*?\|(.*)\]\]""", """\1""")
-              ct = ct.replaceAll("""\[\[Oikeustiede:(.*?)\]\]""","""\1""")
-              ct = ct.replaceAll("""\[\[(.*?)\]\]""", """\1""")
-              for (m <- fields.findAllMatchIn(ct)) {
-                val tag = m.group(1).toLowerCase()
-                val content = m.group(2)
-                tag match {
-                  case "selite_fi" => println("FOUND: "+title)
-                  case "määritelmä_fi" => println("FOUND: "+title)
-                  case "logotiedosto" | "logolinkki" | "tarkistettu" =>
-                  case u => //println(u)
-                }
-              }
-            }
+            if (depth==1) process(form,title,ct)
             ct = cs.last
-            if (depth>1) ct+=process(dct)
+            if (depth>1) ct+=process2(form,dct)
             depth-=1
             cs = cs.dropRight(1)
             i+=1
