@@ -20,7 +20,7 @@ import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.bizo.mighty.csv.CSVReaderSettings
 import com.bizo.mighty.csv.CSVDictReader
 
-object EECSV2RDF extends CSV2RDF {
+object EECSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/ee-schema#"
   val ns = "http://ldf.fi/ee/"

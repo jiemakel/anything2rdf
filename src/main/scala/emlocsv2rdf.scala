@@ -24,7 +24,7 @@ import scala.collection.mutable.Buffer
 import scala.util.control.Breaks._
 import com.hp.hpl.jena.rdf.model.Property
 
-object EMLOCSV2RDF extends CSV2RDF {
+object EMLOCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/emlo/schema#"
   val ns = "http://ldf.fi/emlo/"

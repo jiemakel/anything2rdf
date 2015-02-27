@@ -14,7 +14,7 @@ import com.hp.hpl.jena.vocabulary.DC_11
 import com.hp.hpl.jena.vocabulary.RDFS
 import com.bizo.mighty.csv.CSVDictReader
 
-object ANDCSV2RDF extends CSV2RDF {
+object ANDCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/and-schema#"
   val ns = "http://ldf.fi/and/"

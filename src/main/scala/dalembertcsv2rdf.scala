@@ -20,7 +20,7 @@ import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.bizo.mighty.csv.CSVDictReader
 import com.bizo.mighty.csv.CSVReaderSettings
 
-object DALEMBERTCSV2RDF extends CSV2RDF {
+object DALEMBERTCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/dalembert-schema#"
   val ns = "http://ldf.fi/dalembert/"

@@ -25,7 +25,7 @@ import scala.util.control.Breaks._
 import com.hp.hpl.jena.rdf.model.Property
 import com.bizo.mighty.csv.CSVReaderSettings
 
-object SCHOENBERGCSV2RDF extends CSV2RDF {
+object SCHOENBERGCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/schoenberg/schema#"
   val ns = "http://ldf.fi/schoenberg/"

@@ -19,7 +19,7 @@ import com.hp.hpl.jena.shared.PrefixMapping
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.bizo.mighty.csv.CSVReaderSettings
 
-object PRINCIPALEVENTSCSV2RDF extends CSV2RDF {
+object PRINCIPALEVENTSCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/ww1lod/schema"
   val ns = "http://ldf.fi/ww1lod/"

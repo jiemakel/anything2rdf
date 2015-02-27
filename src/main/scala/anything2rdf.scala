@@ -16,7 +16,7 @@ import com.hp.hpl.jena.rdf.model.Property
 import org.joda.time.format.ISODateTimeFormat
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 
-abstract class CSV2RDF {
+abstract class Anything2RDF {
   
   implicit val m = ModelFactory.createDefaultModel()
 
@@ -103,6 +103,7 @@ abstract class CSV2RDF {
   def R(s: String) = m.createResource(s)
   
   def EC(s: String) = I(sns+camelCase(s),Map("en"->s),OWL.Class)
+  
   
   def I(uri: String, labels : Map[String,String], c : Resource): Resource = {
     val r = m.createResource(uri)

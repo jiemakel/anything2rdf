@@ -20,7 +20,7 @@ import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import scala.util.control.Breaks._
 import scala.collection.mutable.HashMap
 import com.bizo.mighty.csv.CSVDictReader
-object GRANDTOURCSV2RDF extends CSV2RDF {
+object GRANDTOURCSV2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/grandtour-schema#"
   val ns = "http://ldf.fi/grandtour/"

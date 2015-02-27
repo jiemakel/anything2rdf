@@ -25,7 +25,7 @@ import org.json4s.JsonDSL._
 import java.io.File
 import com.hp.hpl.jena.vocabulary.DCTerms
 
-object GRANDTOURJSON2RDF extends CSV2RDF {
+object GRANDTOURJSON2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/grandtour-schema#"
   val ns = "http://ldf.fi/grandtour/"

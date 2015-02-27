@@ -18,7 +18,7 @@ import com.hp.hpl.jena.shared.PrefixMapping
 import org.joda.time.format.ISODateTimeFormat
 import com.bizo.mighty.csv.CSVDictReader
 
-object PROCOPECSV2RDF extends CSV2RDF {
+object PROCOPECSV2RDF extends Anything2RDF {
 
   val sns = "http://ldf.fi/procope-schema#"
   val ns = "http://ldf.fi/procope/"

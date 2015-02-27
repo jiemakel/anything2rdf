@@ -18,51 +18,25 @@ import com.bizo.mighty.csv.CSVDictReader
 import scala.xml.parsing.XhtmlEntities
 import com.hp.hpl.jena.vocabulary.DCTerms
 
-object TTPXML2RDF extends CSV2RDF {
+object TTPXML2RDF extends Anything2RDF {
 
-  val sns = "http://ldf.fi/and-schema#"
-  val ns = "http://ldf.fi/and/"
+  val sns = "http://ldf.fi/ttp-schema#"
+  val ns = "http://ldf.fi/ttp/"
 
-  val period = EOP("period")
-  val authorial_presence = EDP("authorial presence")
-  val mentions = EOP("mentions")
-  val genre = EOP("genre")
-  val practitioner_type = EOP("practitioner type")
-  val prefatory_names = EOP("prefatory names")
-  val Work = EC("Work")
-  val Person = EC("Person")
-  val Genre = EC("Genre")
-  val Period = EC("Period")
-  val Date = EC("Date")
-  val PractitionerType = EC("Practitioner Type")
-  val prose = I(sns + "practitionerTypeProse", Map("en" -> "Prose"), PractitionerType)
-  val canonical = I(sns + "practitionerTypeCanonical", Map("en" -> "Canonical"), PractitionerType)
-  val noncanonical = I(sns + "practitionerTypeNonCanonical", Map("en" -> "Non-Canonical"), PractitionerType)
-  val poetry = I(sns + "PractitionerTypePoetry", Map("en" -> "Poetry"), PractitionerType)
-  val roman = I(sns + "PractitionerTypeRoman", Map("en" -> "Roman"), PractitionerType)
-  val contemporary = I(sns + "PractitionerTypeContemporary", Map("en" -> "Contemporary"), PractitionerType)
-  val myth = I(sns + "PractitionerTypeMyth", Map("en" -> "Myth"), PractitionerType)
-  val oral = I(sns + "PractitionerTypeOral", Map("en" -> "Oral"), PractitionerType)
-
-  def pmentions(s: String, w: Resource, ptypes: Resource*) = s.trim.split(',').map(s => s.trim).filter(s => !s.isEmpty).foreach(s => {
-    val p2 = I(ns + "person_" + encode(s), s, Person)
-    w.addProperty(mentions, p2)
-    ptypes.foreach(ptype => p2.addProperty(practitioner_type, ptype))
-  })
-  
   private val fields = """(?s)\|(.*?)=([^\|]+)""".r
 
   def process(form : String, title : String, content : String) : Unit = {
     var ct = content
-    ct = ct.replaceAll("""\[\[.*?\|(.*)\]\]""", """\1""")
-    ct = ct.replaceAll("""\[\[Oikeustiede:(.*?)\]\]""","""\1""")
-    ct = ct.replaceAll("""\[\[(.*?)\]\]""", """\1""")
-    val r = I(ns+"_"+encode(title),Map("fi"->title),SKOS.Concept)
+    ct = ct.replaceAll("""\[\[.*?\|(.*?)\]\]""", """$1""")
+    ct = ct.replaceAll("""\[\[Oikeustiede:(.*?)\]\]""","""$1""")
+    ct = ct.replaceAll("""\[\[(.*?)\]\]""", """$1""")
+    val r = I(ns+encode(title),Map("fi"->title),SKOS.Concept)
     form match {
+      case "NAMESPACE" =>
       case "Käsite" =>
         for (mt <- fields.findAllMatchIn(ct)) {
           val tag = mt.group(1).toLowerCase()
-          val content = mt.group(2)
+          val content = mt.group(2).trim
           tag match {
             case "selite_fi" => r.addProperty(RDFS.comment,content,"fi")
             case "määritelmä_fi" => r.addProperty(DCTerms.description,content,"fi")
@@ -72,31 +46,42 @@ object TTPXML2RDF extends CSV2RDF {
         }            
       case "Lähikäsite" => for (mt <- fields.findAllMatchIn(ct)) {
           val tag = mt.group(1).toLowerCase()
-          val content = mt.group(2)
+          val content = mt.group(2).trim
           tag match {
             case "käsite" => 
-              val n2 = content.replaceFirst("^Oikeustiede:","")
-              r.addProperty(SKOS.related,I(ns+"_"+encode(n2),Map("fi"->n2),SKOS.Concept))
+              val n2 = content.replaceFirst("^[Oo]ikeustiede:","")
+              r.addProperty(SKOS.related,I(ns++encode(n2),Map("fi"->n2),SKOS.Concept))
             case u => //println(u)
           }
       }
-      case "Liittyvä nimitys" => for (mt <- fields.findAllMatchIn(ct)) {
-          val tag = mt.group(1).toLowerCase()
-          val content = mt.group(2)
-          val lang = ""
-          tag match {
-            case "kieli" => 
-            case "nimitys" => 
-            case u => //println(u)
+      case "Liittyvä nimitys" => 
+          var lang : Option[String] = None
+          var aname : Option[String] = None
+          for (mt <- fields.findAllMatchIn(ct)) {
+            val tag = mt.group(1).toLowerCase()
+            val content = mt.group(2).trim
+            tag match {
+              case "kieli" => lang = content match {
+                case "suomi" => Some("fi")
+                case "ruotsi" => Some("sv")
+                case "englanti" => Some("en")
+                case "saksa" => Some("de")
+                case "ranska" => Some("fr")
+                case "latina" => Some("la")
+                case "norja" => Some("no")
+              }
+              case "nimitys" => aname=Some(content) 
+              case u => //println(u)
+            }
           }
-      }
-      case u => println("Unknown form: "+u)      
+          aname.foreach(n => r.addProperty(SKOS.altLabel,n,lang.getOrElse("fi")))
+      case u => println("Unknown form: "+u+": "+content)      
     }
     
   }
   
   def process2(form : String, content : String) : String = {
-    if (form.toLowerCase()=="lakilinkki|") content.substring(4)+"/"+content.substring(0,4)
+    if (form.toLowerCase()=="lakilinkki") content.substring(5).replaceFirst("^0+","")+"/"+content.substring(1,5)
     else if (form=="NAMESPACE") "Oikeustiede"    
     else {
      println("Unknown subtag: "+form)
@@ -111,7 +96,7 @@ object TTPXML2RDF extends CSV2RDF {
     var text = ""
     while (xml.hasNext) xml.next match {
       case EvElemStart(_,"title", _, _) => 
-        title = xml.next.asInstanceOf[EvText].text.replaceFirst("^Oikeustiede:","")
+        title = xml.next.asInstanceOf[EvText].text.replaceFirst("^Oikeustiede:","").trim
       case EvElemStart(_,"text", _, _) =>
         intext = true
         text+= xml.next.asInstanceOf[EvText].text
@@ -119,11 +104,13 @@ object TTPXML2RDF extends CSV2RDF {
         var depth = 0
         var i = 0
         var cs : Seq[String] = Seq.empty
+        var cf : Seq[String] = Seq.empty
         var ct = ""
         var form = ""
         while (i<text.length) {
           if (text(i)=='{' && i+1<text.length && text(i+1)=='{') {
            cs = cs :+ ct
+           cf = cf :+ form
            ct=""
            depth+=1
            i+=2
@@ -132,12 +119,13 @@ object TTPXML2RDF extends CSV2RDF {
              form+=text(i)
              i+=1
            }
-           i-=2
+           i-=1
           } else if (text(i)=='}' && i+1<text.length && text(i+1)=='}') {
             val dct = ct
             if (depth==1) process(form,title,ct)
             ct = cs.last
             if (depth>1) ct+=process2(form,dct)
+            form = cf.last
             depth-=1
             cs = cs.dropRight(1)
             i+=1
