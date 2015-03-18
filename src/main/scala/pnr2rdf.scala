@@ -19,6 +19,11 @@ import scala.xml.parsing.XhtmlEntities
 import com.hp.hpl.jena.vocabulary.DCTerms
 import java.io.FileInputStream
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
+import scala.collection.mutable.HashMap
+import scala.collection.JavaConversions._
+import scala.collection.mutable.HashSet
+import com.hp.hpl.jena.rdf.model.Statement
+import scala.collection.mutable.ArrayBuffer
 
 object PNR2RDF extends Anything2RDF {
 
@@ -27,9 +32,9 @@ object PNR2RDF extends Anything2RDF {
   
   val PlaceType = I(sns+"PlaceType",Map("fi"->"Paikkatyyppi","en"->"Place Type"),OWL.Class)
   val Language = I(sns+"Language",Map("fi"->"Kieli","en"->"Language"),OWL.Class)
-  val Municipality = I(sns+"Municipality",Map("fi"->"Kunta","en"->"Municipality"),OWL.Class)
-  val Province = I(sns+"Province",Map("fi"->"Lääni","en"->"Province"),OWL.Class)
-  val Region = I(sns+"Region",Map("fi"->"Maakunta","en"->"Region"),OWL.Class)
+  //val Municipality = I(sns+"Municipality",Map("fi"->"Kunta","en"->"Municipality"),OWL.Class)
+  //val Province = I(sns+"Province",Map("fi"->"Lääni","en"->"Province"),OWL.Class)
+  //val Region = I(sns+"Region",Map("fi"->"Maakunta","en"->"Region"),OWL.Class)
   val SubRegion = I(sns+"SubRegion",Map("fi"->"Seutukunta","en"->"Sub-region"),OWL.Class)
   val LargeArea = I(sns+"LargeArea",Map("fi"->"Suuralue","en"->"Large Area"),OWL.Class)
   val MapScale = I(sns+"MapScale",Map("fi"->"Mittakaava","en"->"Map Scale"),OWL.Class)
@@ -44,7 +49,7 @@ object PNR2RDF extends Anything2RDF {
 
   val lmap = Map("fin"->"fi","swe"->"sv","eng"->"en","sme"->"se","smn"->"smn","sms"->"sms")
 
-  def process(file:String,prefix:String, clazz:Resource) {
+  def process(file:String,prefix:String, clazz:Resource,ns:String=sns) {
     var xml = open(file)
     var item : Resource = null
     while (xml.hasNext) xml.next match {
@@ -52,7 +57,7 @@ object PNR2RDF extends Anything2RDF {
         item=R(ns+prefix+"_"+attrs("value")(0).text)
         item.addProperty(RDF.`type`,clazz)
       case EvElemStart(_,"documentation", attrs, _) => 
-        item.addProperty(SKOS.prefLabel,xml.next.asInstanceOf[EvText].text,lmap(attrs.value(0).text))
+        item.addProperty(SKOS.prefLabel,xml.next.asInstanceOf[EvText].text.trim,lmap(attrs.value(0).text))
       case _ =>
     }
   }
@@ -106,15 +111,18 @@ object PNR2RDF extends Anything2RDF {
   
   def main(args: Array[String]): Unit = {
     process("kieli.xsd","language",Language)
-    process("laani.xsd","province",Province)
-    process("kunta.xsd","municipality",Municipality)
+    //process("laani.xsd","province",Province)
+    //process("kunta.xsd","municipality",Municipality)
     process("paikkatyyppiryhma.xsd","place_type",PlaceType)
     process("paikkatyyppialaryhma.xsd","place_type",PlaceType)
     process("paikkatyyppi.xsd","place_type",PlaceType)
     process("mittakaavarelevanssi.xsd","map_scale",MapScale)
-    process("seutukunta.xsd","subregion",SubRegion)
-    process("suuralue.xsd","large_area",LargeArea)
-    process("maakunta.xsd","region",Region)
+    //process("maakunta.xsd","region",Region)
+    val m2 = ModelFactory.createDefaultModel()
+    m2.add(m)
+    m.removeAll()
+    process("seutukunta.xsd","subregion",SubRegion,ns)
+    process("suuralue.xsd","large_area",LargeArea,ns)
     val xml = new XMLEventReader(Source.fromFile("paikka.xml"))
     var item : Resource = null
     var name = ""
@@ -126,6 +134,8 @@ object PNR2RDF extends Anything2RDF {
     var paikkatyyppi : Resource = null
     var paikkatyyppiRyhma : Resource = null
     var paikkatyyppiAlaRyhma : Resource = null
+    var replaceMap = new HashMap[Resource,Resource]()
+    var ptt = ""
     while (xml.hasNext) xml.next match {
       case EvElemStart(_,"Paikka", attrs, _) => 
         item=R(ns+attrs.value(0).text)
@@ -136,14 +146,15 @@ object PNR2RDF extends Anything2RDF {
         item.addProperty(WGS84.lat,""+lat,XSDDatatype.XSDdecimal)
         item.addProperty(WGS84.long,""+lon,XSDDatatype.XSDdecimal)
       case EvElemStart(_,"paikkatyyppiKoodi", _, _) =>
-        paikkatyyppi = R(ns+"place_type"+"_"+xml.next.asInstanceOf[EvText].text)
+        ptt = xml.next.asInstanceOf[EvText].text
+        paikkatyyppi = R(sns+"place_type"+"_"+ptt)
         item.addProperty(RDF.`type`,paikkatyyppi)
       case EvElemStart(_,"paikkatyyppiryhmaKoodi", _, _) =>
-        paikkatyyppiRyhma = R(ns+"place_type"+"_"+xml.next.asInstanceOf[EvText].text)
+        paikkatyyppiRyhma = R(sns+"place_type"+"_"+xml.next.asInstanceOf[EvText].text)
       case EvElemStart(_,"paikkatyyppialaryhmaKoodi", _, _) =>
-        paikkatyyppiAlaRyhma = R(ns+"place_type"+"_"+xml.next.asInstanceOf[EvText].text)
-        paikkatyyppi.addProperty(RDFS.subClassOf,paikkatyyppiAlaRyhma)
-        paikkatyyppiAlaRyhma.addProperty(RDFS.subClassOf,paikkatyyppiRyhma)
+        paikkatyyppiAlaRyhma = R(sns+"place_type"+"_"+xml.next.asInstanceOf[EvText].text)
+        m2.add(paikkatyyppi,RDFS.subClassOf,paikkatyyppiAlaRyhma)
+        m2.add(paikkatyyppiAlaRyhma,RDFS.subClassOf,paikkatyyppiRyhma)
       case EvElemStart(_,"tm35Fin7Koodi", _, _) =>
         item.addProperty(P(sns+"tm35Fin7Koodi"),xml.next.asInstanceOf[EvText].text)
       case EvElemStart(_,"ylj7Koodi", _, _) =>
@@ -152,33 +163,68 @@ object PNR2RDF extends Anything2RDF {
         item.addProperty(P(sns+"pp6Koodi"),xml.next.asInstanceOf[EvText].text)
       case EvElemStart(_,"kuntaKoodi", _, _) =>
         kunta = R(ns+"municipality_"+xml.next.asInstanceOf[EvText].text)
-        item.addProperty(CIDOC.place_falls_within,kunta)
+        ptt match {
+          case "540" | "550" => replaceMap.put(kunta,item)
+          case "580" | "575" =>
+          case _ => 
+            item.addProperty(CIDOC.place_falls_within,kunta)
+        }
       case EvElemStart(_,"seutukuntaKoodi", _, _) =>
         seutukunta = R(ns+"subregion_"+xml.next.asInstanceOf[EvText].text)
         kunta.addProperty(CIDOC.place_falls_within,seutukunta)
       case EvElemStart(_,"maakuntaKoodi", _, _) =>
         maakunta = R(ns+"region_"+xml.next.asInstanceOf[EvText].text)
+        ptt match {
+          case "575" => replaceMap.put(maakunta,item)
+          case _ => 
+        }
         seutukunta.addProperty(CIDOC.place_falls_within,maakunta)
       case EvElemStart(_,"laaniKoodi", _, _) =>
-        kunta.addProperty(CIDOC.place_falls_within,R(ns+"province_"+xml.next.asInstanceOf[EvText].text))
+        val laani = R(ns+"province_"+xml.next.asInstanceOf[EvText].text)
+        ptt match {
+          case "580" => replaceMap.put(laani,item)
+          case _ => 
+        }
+        kunta.addProperty(CIDOC.place_falls_within,laani)
       case EvElemStart(_,"suuralueKoodi", _, _) =>
         maakunta.addProperty(CIDOC.place_falls_within,R(ns+"large_area_"+xml.next.asInstanceOf[EvText].text))
       case EvElemStart(_,"mittakaavarelevanssiKoodi", _, _) =>
-        item.addProperty(P(sns+"mapScale"),R(ns+"map_scale_"+xml.next.asInstanceOf[EvText].text))
+        item.addProperty(P(sns+"mapScale"),R(sns+"map_scale_"+xml.next.asInstanceOf[EvText].text))
       case EvElemStart(_,"kirjoitusasu", _, _) =>
         name = xml.next.asInstanceOf[EvText].text
       case EvElemStart(_,"kieliKoodi", _, _) =>
         lang = xml.next.asInstanceOf[EvText].text
         item.addProperty(SKOS.prefLabel,name,lmap(lang))
       case EvElemStart(_,"kieliVirallisuusKoodi", _, _) =>
-        if (xml.next.asInstanceOf[EvText].text=="1") item.addProperty(P(sns+"officialLanguage"),R(ns+"language_"+lang))
+        if (xml.next.asInstanceOf[EvText].text=="1") item.addProperty(P(sns+"officialLanguage"),R(sns+"language_"+lang))
       case EvElemStart(_,"kieliEnemmistoKoodi", _, _) =>
-        if (xml.next.asInstanceOf[EvText].text=="1") item.addProperty(P(sns+"majorityLanguage"),R(ns+"language_"+lang))
+        if (xml.next.asInstanceOf[EvText].text=="1") item.addProperty(P(sns+"majorityLanguage"),R(sns+"language_"+lang))
         
 /*<pnr:paikkaLuontiAika>2008-12-06T00:00:00.000</pnr:paikkaLuontiAika>
 <pnr:paikkaMuutosAika>2008-12-06T00:00:00.000</pnr:paikkaMuutosAika>*/
       case _ =>
     }
+    m2.setNsPrefix("pnrs", sns)
+    m2.setNsPrefix("pnr",ns)
+    m2.setNsPrefix("crm",CIDOC.ns)
+    m2.setNsPrefix("skos",SKOS.ns)
+    m2.setNsPrefix("rdfs",RDFS.getURI)
+    RDFDataMgr.write(new FileOutputStream("pnr-schema.ttl"), m2, RDFFormat.TTL)
+    for ((k1,k2) <- replaceMap) {
+      val toDel = new ArrayBuffer[Statement]
+      val toAdd = new ArrayBuffer[Statement]
+      for (s<-k1.listProperties()) {
+        toDel += s
+        toAdd += m.createStatement(k2,s.getPredicate,s.getObject)
+      }
+      for (s<-m.listStatements(null,null,k1)) {
+        toDel += s
+        toAdd += m.createStatement(s.getSubject,s.getPredicate,k2)
+      }
+      for (s <- toDel) m.remove(s)
+      for (s <- toAdd) m.add(s)
+    }
     RDFDataMgr.write(new FileOutputStream("pnr.nt"), m, RDFFormat.NT)
+    System.exit(0)
   }
 }

@@ -1,4 +1,4 @@
-name := """csv2rdf"""
+name := """anything2rdf"""
 
 version := "1.0"
 
