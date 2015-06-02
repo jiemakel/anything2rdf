@@ -1,4 +1,4 @@
-name := """csv2rdf"""
+name := """anything2rdf"""
 
 version := "1.0"
 
@@ -16,3 +16,6 @@ libraryDependencies ++= Seq(
 )
 
 Revolver.settings
+
+
+fork in run := true
