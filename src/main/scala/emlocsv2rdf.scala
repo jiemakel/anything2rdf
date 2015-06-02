@@ -119,13 +119,13 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers)
     breakable { for (w <- wr) {
-      val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+w(h("resource_id"))
+      val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+"resource_"+w(h("resource_id"))
       val res = I(iri,w(h("resource_name")),CIDOC.Information_Object)
       resourceMap.put(w(h("resource_id")),res)
       if (!w(h("resource_details")).trim.isEmpty) res.addProperty(DCTerms.license,w(h("resource_details")))
 
     }}
-        val manifestationWorkMap = new HashMap[String,String] 
+    val manifestationWorkMap = new HashMap[String,String] 
 /*    val workAuthorMap = new HashMap[String,Buffer[String]]
     val workAddresseeMap = new HashMap[String,Buffer[String]]
     val workOriginMap = new HashMap[String,Buffer[String]]
@@ -156,7 +156,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val workMetadataMap = new HashMap[String,Metadata]
     breakable { for (w <- wr) {
       workNameMap.put(w(h("work_id")),w(h("description")))
-      val wo = I(ns+w(h("work_id")),Map("en"->w(h("description"))),Letter)
+      val wo = I(ns+"work_"+w(h("work_id")),Map("en"->w(h("description"))),Letter)
       if (!w(h("original_calendar")).trim.isEmpty) wo.addProperty(original_calendar,I(ns+"calendar_"+encode(w(h("original_calendar"))),Map("en"->w(h("original_calendar"))),Calendar)) 
       if (!w(h("original_catalogue")).trim.isEmpty) wo.addProperty(source,I(ns+"source_"+encode(w(h("original_catalogue"))),w(h("original_catalogue")),Source)) 
       if (!w(h("abstract")).trim.isEmpty) wo.addProperty(DCTerms.description,w(h("abstract")).trim,"en")
@@ -191,10 +191,10 @@ object EMLOCSV2RDF extends Anything2RDF {
         val date = if (w(h("date_of_work_std_is_range"))=='1') {
           val (bdateTime,edateTime) = makeDateTime(w(h("date_of_work_std_year")),w(h("date_of_work_std_month")),w(h("date_of_work_std_day")))
           val (bdateTime2,edateTime2) = makeDateTime(w(h("date_of_work2_std_year")),w(h("date_of_work2_std_month")),w(h("date_of_work2_std_day")))
-          I(s"${ns}date_${bdateTime}TO${edateTime}TO${bdateTime2}TO${edateTime2}",s"${bdateTime.substring(0,10)} - ${edateTime2.substring(0,10)}",CIDOC.TimeSpan)
+          makeTimeSpan(s"${bdateTime.substring(0,10)} - ${edateTime2.substring(0,10)}", Some(bdateTime), Some(edateTime), Some(bdateTime2), Some(edateTime2))
         } else {
           val (bdateTime,edateTime) = makeDateTime(w(h("date_of_work_std_year")),w(h("date_of_work_std_month")),w(h("date_of_work_std_day")))
-          I(s"${ns}date_${bdateTime}TO${edateTime}",s"${bdateTime.substring(0,10)}",CIDOC.TimeSpan)
+          makeTimeSpan(s"${bdateTime.substring(0,10)}",Some(bdateTime),Some(edateTime),Some(bdateTime),Some(edateTime))
         }
         if (w(h("date_of_work_approx"))=="1") wo.addProperty(adate,date)
         else if (w(h("date_of_work_uncertain"))=="1") wo.addProperty(pdate,date)
@@ -237,10 +237,10 @@ object EMLOCSV2RDF extends Anything2RDF {
       val t = EC(w(h("manifestation_type")))
       t.addProperty(RDFS.subClassOf,CIDOC.Information_Carrier)
       val ma = if (w(h("manifestation_type"))=="Letter") {
-        val tmp = m.createResource(ns+manifestationWorkMap.get(w(h("manifestation_id"))).get) 
+        val tmp = m.createResource(ns+"work_"+manifestationWorkMap.get(w(h("manifestation_id"))).get) 
         manifestationMap.put(w(h("manifestation_id")),tmp)
         tmp
-      } else I(ns+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
+      } else I(ns+"manifestation_"+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
       if (!w(h("id_number_or_shelfmark")).trim.isEmpty) ma.addProperty(id_number_or_shelfmark,w(h("id_number_or_shelfmark")))
       if (!w(h("printed_edition_details")).trim.isEmpty) ma.addProperty(printed_edition_details,w(h("printed_edition_details")))
       if (!w(h("paper_size")).trim.isEmpty) ma.addProperty(paper_size,w(h("paper_size")))
@@ -260,7 +260,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       if (!w(h("manifestation_creation_calendar")).trim.isEmpty) ma.addProperty(original_calendar,I(ns+"calendar_"+encode(w(h("manifestation_creation_calendar"))),Map("en"->w(h("manifestation_creation_calendar"))),Calendar)) 
       if (!w(h("manifestation_creation_date_year")).trim.isEmpty) {
         val (bdateTime,edateTime) = makeDateTime(w(h("manifestation_creation_date_year")),w(h("manifestation_creation_date_month")),w(h("manifestation_creation_date_day")))
-        val date = I(s"${ns}date_${bdateTime}TO${edateTime}",s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",CIDOC.TimeSpan)
+        val date = makeTimeSpan(s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",Some(bdateTime),Some(edateTime),Some(bdateTime),Some(edateTime))
         if (w(h("manifestation_creation_date_approx"))=="1") ma.addProperty(adate,date)
         else if (w(h("manifestation_creation_date_uncertain"))=="1") ma.addProperty(pdate,date)
         else if (w(h("manifestation_creation_date_inferred"))=="1") ma.addProperty(idate,date)
@@ -278,20 +278,23 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers)
+    val ltable = h("left_table_name")
+    val rtable = h("right_table_name")
     breakable { for (w <- wr) {
         w(ind) match {
-          case "cofk_union_relationship_type-created" => m.add(m.createResource(ns+w(liv)),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(ns+w(riv)))
-          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(ns+w(liv)),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(ns+w(riv)))
-          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(ns+w(liv)),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(ns+w(riv)))
-          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(ns+w(liv)),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(ns+w(riv)))
-          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(ns+w(liv)),m.createProperty(sns+w(ind)),m.createResource(ns+w(riv)))
+          case "cofk_union_relationship_type-created" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
+          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
+          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
+          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
+          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),m.createProperty(sns+w(ind)),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
           case _ => 
-            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(ns+w(liv)))))
-            val riri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(ns+w(riv)))))
+            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)))))
+            val riri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))))
             m.add(liri,m.createProperty(sns+w(ind)),riri)
         }
 
     }}
+//relationship_id,left_table_name,left_id_value,relationship_type,right_table_name,right_id_value,relationship_valid_from,relationship_valid_till,creation_timestamp,creation_user,change_timestamp,change_user
     wr = CSVReader("cofk_union_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
@@ -299,7 +302,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val locationMap = new HashMap[String,Resource]()
     val locationFNMap = new HashMap[String,Resource]()
     breakable { for (w <- wr) {
-      val l = m.createResource(ns+w(h("location_id")))
+      val l = m.createResource(ns+"location_"+w(h("location_id")))
       l.addProperty(RDF.`type`,CIDOC.Place)
       l.addProperty(RDFS.label,w(h("location_name")))
       w(h("location_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach{n => 
@@ -327,7 +330,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers)
     breakable { for (w <- wr) {
-      val i = I(ns+w(h("institution_id")),w(h("institution_name")),CIDOC.Legal_Body)
+      val i = I(ns+"institution_"+w(h("institution_id")),w(h("institution_name")),CIDOC.Legal_Body)
       w(h("institution_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach(n => i.addProperty(SKOS.altLabel,n))
       val city = if (!w(h("institution_city")).trim.isEmpty) {
         val city = locationMap.getOrElse(w(h("institution_city")), {
@@ -366,7 +369,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers)
     breakable { for (w <- wr) {
-      val p = I(ns+w(h("person_id")),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
+      val p = I(ns+(if (!w(h("is_organisation")).trim.isEmpty) "organization" else "person")+"_"+w(h("person_id")),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
       if (!w(h("gender")).trim.isEmpty) {
         (w(h("gender"))) match {
           case "M" => p.addProperty(FOAF.gender,SDMXCode.sexMale)
@@ -382,7 +385,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       w(h("person_aliases")).split(Array('\n',';')).map(_.trim).filter(!_.isEmpty).foreach(p.addProperty(SKOS.altLabel,_))
       if (!w(h("date_of_birth_year")).trim.isEmpty) {
         val (bdateTime,edateTime) = makeDateTime(w(h("date_of_birth_year")),w(h("date_of_birth_month")),w(h("date_of_birth_day")))
-        val date = I(s"${ns}date_${bdateTime}TO${edateTime}",s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",CIDOC.TimeSpan)
+        val date = makeTimeSpan(s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",Some(bdateTime),Some(edateTime),Some(bdateTime),Some(edateTime))
         if (w(h("date_of_birth_approx"))=="1") p.addProperty(abdate,date)
         else if (w(h("date_of_birth_uncertain"))=="1") p.addProperty(pbdate,date)
         else if (w(h("date_of_birth_inferred"))=="1") p.addProperty(ibdate,date)
@@ -390,7 +393,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       }
       if (!w(h("date_of_death_year")).trim.isEmpty) {
         val (bdateTime,edateTime) = makeDateTime(w(h("date_of_death_year")),w(h("date_of_death_month")),w(h("date_of_death_day")))
-        val date = I(s"${ns}date_${bdateTime}TO${edateTime}",s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",CIDOC.TimeSpan)
+        val date = makeTimeSpan(s"${bdateTime.substring(0,10)}-${edateTime.substring(0,10)}",Some(bdateTime),Some(edateTime),Some(bdateTime),Some(edateTime))
         if (w(h("date_of_death_approx"))=="1") p.addProperty(addate,date)
         else if (w(h("date_of_death_uncertain"))=="1") p.addProperty(pddate,date)
         else if (w(h("date_of_death_inferred"))=="1") p.addProperty(iddate,date)
@@ -411,6 +414,116 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //csv2rdf List(relationship_id, left_table_name, left_id_value, relationship_type, right_table_name, right_id_value, relationship_valid_from, relationship_valid_till, creation_timestamp, creation_user, change_timestamp, change_user)
+    wr = CSVReader("pro_activity.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val e = R(ns+"activity_"+w(h("id")))
+      ANE(e,RDFS.comment,w(h("additional_notes")),"en")
+      val pname = w(h("notes_used")).trim
+      if (!pname.isEmpty)
+        e.addProperty(DCTerms.source,I(ns+"person_"+encode(pname),pname,CIDOC.Person))
+      val dprop = if (w(h("date_to_uncertainty"))=="Uncertain" || w(h("date_from_uncertainty"))=="Uncertain") pdate
+      else if (w(h("date_to_uncertainty"))=="Inferred" || w(h("date_from_uncertainty"))=="Inferred") idate
+      else if (w(h("date_to_uncertainty"))=="Approximate" || w(h("date_from_uncertainty"))=="Approximate") adate
+      else CIDOC.has_timeSpan
+      val (name,bob,eob,boe,eoe) = w(h("date_type")) match {
+        case "Before" => 
+          val (boe,eoe) = if (!w(h("date_to_year")).trim.isEmpty) makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+          ("Before "+ (if (!w(h("date_to_year")).trim.isEmpty) makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))),None,None,Some(boe),Some(eoe))
+        case "After" =>
+          val (bob,eob) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+          ("After "+makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))),Some(bob),Some(eob),None,None)
+        case "Between" =>
+          val (bob,_) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+          val (_,eoe) = makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          ("Between " + makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))+ " and "+makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))),Some(bob),Some(eoe),Some(bob),Some(eoe))
+        case "Duration" =>
+          val (bob,eob) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+          val (boe,eoe) = makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))+'-'+makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))),Some(bob),Some(eob),Some(boe),Some(eoe))
+      }
+      val ts = makeTimeSpan(name, bob, eob, boe, eoe)
+      e.addProperty(dprop,ts)
+      ANE(e,DCTerms.description,w(h("activity_name")))
+      ANE(e,RDFS.comment,w(h("activity_description")))
+      val atype = w(h("activity_type_id"))
+      val atypeC = I(sns+"activityType_"+encode(atype),Map("en"->atype),OWL.Class)
+      atypeC.addProperty(RDFS.subClassOf,CIDOC.Activity)
+      e.addProperty(RDF.`type`,atypeC)
+    }
+//id,activity_type_id,activity_name,activity_description,date_type,date_from_year,date_from_month,date_from_day,date_from_uncertainty,date_to_year,date_to_month,date_to_day,date_to_uncertainty,notes_used,additional_notes,creation_timestamp,creation_user,change_timestamp,change_user,event_label    
+    wr = CSVReader("pro_location.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val e = R(ns+"activity_"+w(h("activity_id")))
+      val l = R(ns+"location_"+w(h("location_id")))
+      e.addProperty(CIDOC.took_place_at,l)
+    }
+//id,location_id,change_timestamp,activity_id   
+    wr = CSVReader("pro_primary_person.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val e = R(ns+"activity_"+w(h("activity_id")))
+      val p = R(ns+"person_"+w(h("person_id")))
+      e.addProperty(CIDOC.had_participant,p)
+    }
+//id,person_id,change_timestamp,activity_id
+    wr = CSVReader("pro_role_in_activity.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val a = R(ns+w(h("entity_type")).toLowerCase+'_'+w(h("person_id")))
+      val r = R(sns+"role_"+w(h("role_id")))
+      val e = R(ns+"activity_"+w(h("activity_id")))
+      val as = I(ns+"role_in_activity_"+w(h("id")),"",PROV.Association)
+      as.addProperty(PROV.agent,a)
+      as.addProperty(PROV.hadRole,r)
+      e.addProperty(PROV.qualifiedAssociation,as)
+    }
+//id,entity_type,entity_id,role_id,change_timestamp,activity_id
+    wr = CSVReader("pro_relationship.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val s = R(ns+w(h("subject_type")).toLowerCase+'_'+w(h("subject_id")))
+      val o = R(ns+w(h("object_type")).toLowerCase+'_'+w(h("object_id")))
+      s.addProperty(P(sns+w(h("relationship_id"))),o)
+    }
+//id,subject_id,subject_type,subject_role_id,relationship_id,object_id,
+//object_type,object_role_id,change_timestamp,activity_id
+    wr = CSVReader("pro_assertion.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val a = R(ns+"activity_"+w(h("assertion_id")))
+      val s = if (!w(h("source_description")).trim.isEmpty) {
+        val s = I(ns+"source_"+w(h("source_id"))+"_"+encode(w(h("source_description")).trim),"",CIDOC.Document)
+        s.addProperty(DCTerms.description,w(h("source_description")))
+        s.addProperty(DCTerms.isPartOf,R(ns+"source_"+w(h("source_id"))))
+      } else R(ns+"source_"+w(h("source_id")))
+      a.addProperty(CIDOC.is_documented_in,s)
+    }
+//id,assertion_type,assertion_id,source_id,source_description,change_timestamp    
+    wr = CSVReader("pro_textual_source.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers)
+    for (w <- wr) {
+      val s = I(ns+"source_"+w(h("id")),"",CIDOC.Document)
+    }
+//id,author,title,chapterArticleTitle,volumeSeriesNumber,issueNumber,pageNumber,editor,
+//placePublication,datePublication,urlResource,abbreviation,fullBibliographicDetails,
+//edition,reprintFacsimile,repository,creation_user,creation_timestamp,change_user,
+//change_timestamp    
     m.setNsPrefixes(PrefixMapping.Standard)
     m.setNsPrefix("org",ORG.ns)
     m.setNsPrefix("dcterms",DCTerms.NS)
