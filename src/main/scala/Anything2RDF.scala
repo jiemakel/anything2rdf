@@ -15,8 +15,9 @@ import com.hp.hpl.jena.vocabulary.RDFS
 import com.hp.hpl.jena.rdf.model.Property
 import org.joda.time.format.ISODateTimeFormat
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
+import com.typesafe.scalalogging.LazyLogging
 
-abstract class Anything2RDF {
+abstract class Anything2RDF extends LazyLogging {
   
   implicit val m = ModelFactory.createDefaultModel()
 

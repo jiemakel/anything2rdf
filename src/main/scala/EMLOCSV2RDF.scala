@@ -103,7 +103,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_image.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val imageMap = new HashMap[String,Resource]
     breakable { for (w <- wr) {
       val i = m.createResource(w(h("image_filename")))
@@ -117,7 +117,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_resource.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     breakable { for (w <- wr) {
       val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+"resource_"+w(h("resource_id"))
       val res = I(iri,w(h("resource_name")),CIDOC.Information_Object)
@@ -133,7 +133,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val ind = h("relationship_type")
     val liv = h("left_id_value")
     val riv = h("right_id_value")
@@ -151,7 +151,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val workNameMap = new HashMap[String,String]
     val workMetadataMap = new HashMap[String,Metadata]
     breakable { for (w <- wr) {
@@ -231,13 +231,13 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_manifestation.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val manifestationMap = new HashMap[String,Resource]
-    breakable { for (w <- wr) {
+    breakable { for (w <- wr) if (!manifestationWorkMap.contains(w(h("manifestation_id")))) logger.warn(s"Manifestation ${w(h("manifestation_id"))} is a manifestation of no work!") else { 
       val t = EC(w(h("manifestation_type")))
       t.addProperty(RDFS.subClassOf,CIDOC.Information_Carrier)
       val ma = if (w(h("manifestation_type"))=="Letter") {
-        val tmp = m.createResource(ns+"work_"+manifestationWorkMap.get(w(h("manifestation_id"))).get) 
+        val tmp = m.createResource(ns+"work_"+manifestationWorkMap(w(h("manifestation_id")))) 
         manifestationMap.put(w(h("manifestation_id")),tmp)
         tmp
       } else I(ns+"manifestation_"+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
@@ -277,7 +277,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val ltable = h("left_table_name")
     val rtable = h("right_table_name")
     breakable { for (w <- wr) {
@@ -298,7 +298,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     val locationMap = new HashMap[String,Resource]()
     val locationFNMap = new HashMap[String,Resource]()
     breakable { for (w <- wr) {
@@ -328,7 +328,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_institution.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     breakable { for (w <- wr) {
       val i = I(ns+"institution_"+w(h("institution_id")),w(h("institution_name")),CIDOC.Legal_Body)
       w(h("institution_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach(n => i.addProperty(SKOS.altLabel,n))
@@ -367,7 +367,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_person.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     breakable { for (w <- wr) {
       val p = I(ns+(if (!w(h("is_organisation")).trim.isEmpty) "organization" else "person")+"_"+w(h("person_id")),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
       if (!w(h("gender")).trim.isEmpty) {
@@ -405,7 +405,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_relationship_type.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     breakable { for (w <- wr) {
       val p = I(sns+w(h("relationship_code")),Map("en"->w(h("desc_left_to_right"))),OWL.ObjectProperty)
       val ip = I(sns+w(h("relationship_code"))+"_inverse",Map("en"->w(h("desc_right_to_left"))),OWL.ObjectProperty)
@@ -417,7 +417,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_activity.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("id")))
       ANE(e,RDFS.comment,w(h("additional_notes")),"en")
@@ -428,7 +428,13 @@ object EMLOCSV2RDF extends Anything2RDF {
       else if (w(h("date_to_uncertainty"))=="Inferred" || w(h("date_from_uncertainty"))=="Inferred") idate
       else if (w(h("date_to_uncertainty"))=="Approximate" || w(h("date_from_uncertainty"))=="Approximate") adate
       else CIDOC.has_timeSpan
-      val (name,bob,eob,boe,eoe) = w(h("date_type")) match {
+      val (name,bob,eob,boe,eoe) = if (w(h("date_from_year")).trim.isEmpty && (!w(h("date_from_month")).trim.isEmpty || !w(h("date_from_day")).trim.isEmpty)) {
+        logger.warn(s"borked from-date: ${makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))}")
+        ("",None,None,None,None)
+      } else if (w(h("date_to_year")).trim.isEmpty && (!w(h("date_to_month")).trim.isEmpty || !w(h("date_to_day")).trim.isEmpty)) {
+        logger.warn(s"borked to-date: ${makeDateString(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))}")
+        ("",None,None,None,None)
+      } else w(h("date_type")) match {
         case "Before" => 
           val (boe,eoe) = if (!w(h("date_to_year")).trim.isEmpty) makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
           ("Before "+ (if (!w(h("date_to_year")).trim.isEmpty) makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))),None,None,Some(boe),Some(eoe))
@@ -443,9 +449,19 @@ object EMLOCSV2RDF extends Anything2RDF {
           val (bob,eob) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
           val (boe,eoe) = makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
           (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))+'-'+makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))),Some(bob),Some(eob),Some(boe),Some(eoe))
+        case "" =>
+          if (w(h("date_from_year")).isEmpty) {
+            if (!w(h("date_to_year")).trim.isEmpty || !w(h("date_to_month")).trim.isEmpty || !w(h("date_to_day")).trim.isEmpty) logger.warn(s"borked to-date: ${makeDateString(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))}")
+            ("",None,None,None,None)
+          } else {
+            val (bob,eoe) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+            (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))),Some(bob),Some(eoe),Some(bob),Some(eoe))
+          }
       }
-      val ts = makeTimeSpan(name, bob, eob, boe, eoe)
-      e.addProperty(dprop,ts)
+      if (!name.isEmpty) {
+        val ts = makeTimeSpan(name, bob, eob, boe, eoe)
+        e.addProperty(dprop,ts)
+      }
       ANE(e,DCTerms.description,w(h("activity_name")))
       ANE(e,RDFS.comment,w(h("activity_description")))
       val atype = w(h("activity_type_id"))
@@ -457,7 +473,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("activity_id")))
       val l = R(ns+"location_"+w(h("location_id")))
@@ -467,7 +483,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_primary_person.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("activity_id")))
       val p = R(ns+"person_"+w(h("person_id")))
@@ -477,7 +493,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_role_in_activity.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val a = R(ns+w(h("entity_type")).toLowerCase+'_'+w(h("person_id")))
       val r = R(sns+"role_"+w(h("role_id")))
@@ -491,7 +507,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val s = R(ns+w(h("subject_type")).toLowerCase+'_'+w(h("subject_id")))
       val o = R(ns+w(h("object_type")).toLowerCase+'_'+w(h("object_id")))
@@ -502,7 +518,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_assertion.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val a = R(ns+"activity_"+w(h("assertion_id")))
       val s = if (!w(h("source_description")).trim.isEmpty) {
@@ -516,7 +532,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_textual_source.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers)
+    println(headers.toSeq)
     for (w <- wr) {
       val s = I(ns+"source_"+w(h("id")),"",CIDOC.Document)
     }

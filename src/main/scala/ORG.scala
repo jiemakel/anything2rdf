@@ -1,4 +1,3 @@
-
 import com.hp.hpl.jena.rdf.model.ResourceFactory
 
 /**
