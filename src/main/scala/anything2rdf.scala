@@ -40,6 +40,19 @@ abstract class Anything2RDF {
      eoe.foreach(ts.addProperty(CIDOC.end_of_the_end,_,XSDDatatype.XSDdateTime))
      ts
   }
+  
+  def makeDateString(year:String,month:String,date:String): String = {
+    var ret = year
+    if (!month.isEmpty) {
+      ret += '-'
+      ret += month
+      if (!date.isEmpty) {
+        ret += '-'
+        ret += date
+      }
+    }
+    ret
+  }
 
   def makeDateTime(year:String,month:String,date:String): (String, String) = {
     val ayear = "0"*(4-year.length)+year
