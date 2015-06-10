@@ -21,7 +21,6 @@ import com.bizo.mighty.csv.CSVDictReader
 import scala.collection.mutable.HashMap
 import com.bizo.mighty.csv.CSVReaderSettings
 import org.apache.jena.riot.RIOT
-import org.apache.jena.riot.out.NTriplesWriter
 
 object GeoNamesCSV2RDF extends Anything2RDF {
   

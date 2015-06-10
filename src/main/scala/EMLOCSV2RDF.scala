@@ -23,11 +23,12 @@ import scala.collection.mutable.ArrayBuffer
 import scala.collection.mutable.Buffer
 import scala.util.control.Breaks._
 import com.hp.hpl.jena.rdf.model.Property
+import scala.util.Try
 
 object EMLOCSV2RDF extends Anything2RDF {
   
-  val sns = "http://ldf.fi/emlo/schema#"
-  val ns = "http://ldf.fi/emlo/"
+  val sns = "http://emlo.bodleian.ox.ac.uk/schema#"
+  val ns = "http://emlo.bodleian.ox.ac.uk/id/"
   val credits = EOP("Credits")
   
   val Letter = EC("Letter")
@@ -96,6 +97,16 @@ object EMLOCSV2RDF extends Anything2RDF {
     val destination_property : Property
   )
 
+  
+  val unCCRegex = "(?<=[A-Z])(?=[A-Z][a-z])|(?<=[^A-Z])(?=[A-Z])|(?<=[A-Za-z])(?=[^A-Za-z])".r
+  def unCamelCase(str : String) : String = {
+    unCCRegex.replaceAllIn(str, " ")
+  }
+  
+  def getUUIDURI(id : String)(implicit uuidMap: HashMap[String,String]) : String = {
+    ns+uuidMap.getOrElse(id,id)
+  }
+
   def main(args: Array[String]): Unit = {
     var wr : CSVReader = null
     var headers: Array[String] = null
@@ -119,17 +130,13 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
     breakable { for (w <- wr) {
-      val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+"resource_"+w(h("resource_id"))
+      val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+w(h("resource_id"))
       val res = I(iri,w(h("resource_name")),CIDOC.Information_Object)
       resourceMap.put(w(h("resource_id")),res)
       if (!w(h("resource_details")).trim.isEmpty) res.addProperty(DCTerms.license,w(h("resource_details")))
 
     }}
     val manifestationWorkMap = new HashMap[String,String] 
-/*    val workAuthorMap = new HashMap[String,Buffer[String]]
-    val workAddresseeMap = new HashMap[String,Buffer[String]]
-    val workOriginMap = new HashMap[String,Buffer[String]]
-    val workDestinationMap = new HashMap[String,Buffer[String]]*/
     wr = CSVReader("cofk_union_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
@@ -137,17 +144,11 @@ object EMLOCSV2RDF extends Anything2RDF {
     val ind = h("relationship_type")
     val liv = h("left_id_value")
     val riv = h("right_id_value")
-    for (w <- wr) {
+    for (w <- wr)
         if (w(ind)=="cofk_union_relationship_type-is_manifestation_of") manifestationWorkMap.put(w(liv),w(riv))
-/*        w(ind) match {
-          case "cofk_union_relationship_type-created" => workAuthorMap.getOrElseUpdate(w(h("right_id_value")),new ArrayBuffer[String])+=(w(h("left_id_value")))
-          case "cofk_union_relationship_type-is_manifestation_of" => manifestationWorkMap.put(w(h("left_id_value")),w(h("right_id_value")))
-          case "cofk_union_relationship_type-was_sent_from" => workOriginMap.getOrElseUpdate(w(h("left_id_value")),new ArrayBuffer[String])+=(w(h("right_id_value")))
-          case "cofk_union_relationship_type-was_sent_to" => workDestinationMap.getOrElseUpdate(w(h("left_id_value")),new ArrayBuffer[String])+=(w(h("right_id_value")))
-          case "cofk_union_relationship_type-was_addressed_to" => workAddresseeMap.getOrElseUpdate(w(h("left_id_value")),new ArrayBuffer[String])+=(w(h("right_id_value")))
-          case _ => 
-        }*/
-    }
+    implicit val uuidMap = new HashMap[String,String]
+    wr = CSVReader("uuidmap.csv")
+    for (w <- wr) uuidMap.put(w(0),w(1))
     wr = CSVReader("cofk_union_work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
@@ -156,7 +157,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val workMetadataMap = new HashMap[String,Metadata]
     breakable { for (w <- wr) {
       workNameMap.put(w(h("work_id")),w(h("description")))
-      val wo = I(ns+"work_"+w(h("work_id")),Map("en"->w(h("description"))),Letter)
+      val wo = I(getUUIDURI(w(h("work_id"))),Map("en"->w(h("description"))),Letter)
       if (!w(h("original_calendar")).trim.isEmpty) wo.addProperty(original_calendar,I(ns+"calendar_"+encode(w(h("original_calendar"))),Map("en"->w(h("original_calendar"))),Calendar)) 
       if (!w(h("original_catalogue")).trim.isEmpty) wo.addProperty(source,I(ns+"source_"+encode(w(h("original_catalogue"))),w(h("original_catalogue")),Source)) 
       if (!w(h("abstract")).trim.isEmpty) wo.addProperty(DCTerms.description,w(h("abstract")).trim,"en")
@@ -171,19 +172,15 @@ object EMLOCSV2RDF extends Anything2RDF {
       val aprop = if (w(h("authors_uncertain"))=='1') authors_uncertain
       else if (w(h("authors_inferred"))=='1') authors_inferred
       else m.createProperty(sns+"cofk_union_relationship_type-created")
-//      workAuthorMap.getOrElse(w(h("work_id")),Buffer.empty).foreach(s => wo.addProperty(aprop,m.createResource(ns+s)))
       val rprop = if (w(h("addressees_uncertain"))=='1') addressees_uncertain
       else if (w(h("addressees_inferred"))=='1') addressees_inferred
       else m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")
-//      workAddresseeMap.getOrElse(w(h("work_id")),Buffer.empty).foreach(s => wo.addProperty(rprop,m.createResource(ns+s)))
       val oprop = if (w(h("origin_uncertain"))=='1') origin_uncertain
       else if (w(h("origin_inferred"))=='1') origin_inferred
       else m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")
-//      workOriginMap.getOrElse(w(h("work_id")),Buffer.empty).foreach(s => wo.addProperty(oprop,m.createResource(ns+s)))
       val dprop = if (w(h("destination_uncertain"))=='1') destination_uncertain
       else if (w(h("destination_inferred"))=='1') destination_inferred
       else m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")
-//      workDestinationMap.getOrElse(w(h("work_id")),Buffer.empty).foreach(s => wo.addProperty(dprop,m.createResource(ns+s)))
       val md = new Metadata(aprop,rprop,oprop,dprop)
       workMetadataMap.put(w(h("work_id")),md)
       w(h("language_of_work")).split(',').map(_.trim).filter(!_.isEmpty).foreach(k => wo.addProperty(DCTerms.language,I(ns+"language_"+encode(k),Map("en"->k),Language)));
@@ -237,10 +234,10 @@ object EMLOCSV2RDF extends Anything2RDF {
       val t = EC(w(h("manifestation_type")))
       t.addProperty(RDFS.subClassOf,CIDOC.Information_Carrier)
       val ma = if (w(h("manifestation_type"))=="Letter") {
-        val tmp = m.createResource(ns+"work_"+manifestationWorkMap(w(h("manifestation_id")))) 
+        val tmp = m.createResource(getUUIDURI(manifestationWorkMap(w(h("manifestation_id"))))) 
         manifestationMap.put(w(h("manifestation_id")),tmp)
         tmp
-      } else I(ns+"manifestation_"+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
+      } else I(ns+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
       if (!w(h("id_number_or_shelfmark")).trim.isEmpty) ma.addProperty(id_number_or_shelfmark,w(h("id_number_or_shelfmark")))
       if (!w(h("printed_edition_details")).trim.isEmpty) ma.addProperty(printed_edition_details,w(h("printed_edition_details")))
       if (!w(h("paper_size")).trim.isEmpty) ma.addProperty(paper_size,w(h("paper_size")))
@@ -278,18 +275,16 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
-    val ltable = h("left_table_name")
-    val rtable = h("right_table_name")
     breakable { for (w <- wr) {
         w(ind) match {
-          case "cofk_union_relationship_type-created" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
-          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
-          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
-          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
-          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)),m.createProperty(sns+w(ind)),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))
+          case "cofk_union_relationship_type-created" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(getUUIDURI(w(liv))),m.createProperty(sns+w(ind)),m.createResource(getUUIDURI(w(riv))))
           case _ => 
-            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(ns+w(ltable).substring(10)+'_'+w(liv)))))
-            val riri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(ns+w(rtable).substring(10)+'_'+w(riv)))))
+            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(getUUIDURI(w(liv))))))
+            val riri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(getUUIDURI(w(riv))))))
             m.add(liri,m.createProperty(sns+w(ind)),riri)
         }
 
@@ -302,7 +297,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val locationMap = new HashMap[String,Resource]()
     val locationFNMap = new HashMap[String,Resource]()
     breakable { for (w <- wr) {
-      val l = m.createResource(ns+"location_"+w(h("location_id")))
+      val l = m.createResource(getUUIDURI(w(h("location_id"))))
       l.addProperty(RDF.`type`,CIDOC.Place)
       l.addProperty(RDFS.label,w(h("location_name")))
       w(h("location_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach{n => 
@@ -330,7 +325,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
     breakable { for (w <- wr) {
-      val i = I(ns+"institution_"+w(h("institution_id")),w(h("institution_name")),CIDOC.Legal_Body)
+      val i = I(getUUIDURI(w(h("institution_id"))),w(h("institution_name")),CIDOC.Legal_Body)
       w(h("institution_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach(n => i.addProperty(SKOS.altLabel,n))
       val city = if (!w(h("institution_city")).trim.isEmpty) {
         val city = locationMap.getOrElse(w(h("institution_city")), {
@@ -368,13 +363,17 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
+    val personIdMap = new HashMap[String,Resource]
+    val personNameMap = new HashMap[String,String]
     breakable { for (w <- wr) {
-      val p = I(ns+(if (!w(h("is_organisation")).trim.isEmpty) "organization" else "person")+"_"+w(h("person_id")),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
+      val p = I(getUUIDURI(w(h("person_id"))),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
+      personIdMap.put(w(h("iperson_id")),p)      
+      personNameMap.put(w(h("iperson_id")),w(h("foaf_name")))
       if (!w(h("gender")).trim.isEmpty) {
         (w(h("gender"))) match {
           case "M" => p.addProperty(FOAF.gender,SDMXCode.sexMale)
           case "F" => p.addProperty(FOAF.gender,SDMXCode.sexFemale)
-          case _ => println("Unknown gender "+w(h("gender")))
+          case _ => logger.warn("Unknown gender "+w(h("gender")))
         }
       }
       p.addProperty(iperson_id,w(h("iperson_id")))
@@ -418,6 +417,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
+    val activityTypeNameMap = new HashMap[String,String]
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("id")))
       ANE(e,RDFS.comment,w(h("additional_notes")),"en")
@@ -435,27 +435,34 @@ object EMLOCSV2RDF extends Anything2RDF {
         logger.warn(s"borked to-date: ${makeDateString(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))}")
         ("",None,None,None,None)
       } else w(h("date_type")) match {
-        case "Before" => 
+        case "Before" =>
           val (boe,eoe) = if (!w(h("date_to_year")).trim.isEmpty) makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
           ("Before "+ (if (!w(h("date_to_year")).trim.isEmpty) makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))),None,None,Some(boe),Some(eoe))
         case "After" =>
-          val (bob,eob) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
-          ("After "+makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))),Some(bob),Some(eob),None,None)
+          val (bob,eob) = if (!w(h("date_from_year")).trim.isEmpty) makeDateTime(w(h("date_from_year")),w(h("date_from_month")), w(h("date_from_day"))) else makeDateTime(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))
+          ("After "+( if (!w(h("date_from_year")).trim.isEmpty) makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))) else makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))),Some(bob),Some(eob),None,None)
         case "Between" =>
-          val (bob,_) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
-          val (_,eoe) = makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          val (bob,_) = if (!w(h("date_from_year")).trim.isEmpty) makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))) else makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          val (_,eoe) = if (!w(h("date_to_year")).trim.isEmpty) makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
           ("Between " + makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))+ " and "+makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))),Some(bob),Some(eoe),Some(bob),Some(eoe))
         case "Duration" =>
-          val (bob,eob) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
-          val (boe,eoe) = makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          val (bob,eob) = if (!w(h("date_from_year")).trim.isEmpty) makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))) else makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day")))
+          val (boe,eoe) = if (!w(h("date_to_year")).trim.isEmpty) makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))) else makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
           (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))+'-'+makeDateString(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))),Some(bob),Some(eob),Some(boe),Some(eoe))
         case "" =>
           if (w(h("date_from_year")).isEmpty) {
-            if (!w(h("date_to_year")).trim.isEmpty || !w(h("date_to_month")).trim.isEmpty || !w(h("date_to_day")).trim.isEmpty) logger.warn(s"borked to-date: ${makeDateString(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))}")
+            if (!w(h("date_to_year")).trim.isEmpty || !w(h("date_to_month")).trim.isEmpty || !w(h("date_to_day")).trim.isEmpty) logger.warn(s"extraneous to-date: ${makeDateString(w(h("date_to_year")),w(h("date_to_month")),w(h("date_to_day")))}")
             ("",None,None,None,None)
           } else {
-            val (bob,eoe) = makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
-            (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))),Some(bob),Some(eoe),Some(bob),Some(eoe))
+            val tmp = Try(if (!w(h("date_from_year")).isEmpty) makeDateTime(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))
+            else makeDateTime(w(h("date_to_year")),w(h("date_to_month")), w(h("date_to_day"))))
+            if (tmp.isFailure) {
+              logger.warn(s"borked from-date: ${makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day")))}")
+              ("",None,None,None,None)
+            } else {
+              val (bob,eoe) = tmp.get
+              (makeDateString(w(h("date_from_year")),w(h("date_from_month")),w(h("date_from_day"))),Some(bob),Some(eoe),Some(bob),Some(eoe))
+            }
           }
       }
       if (!name.isEmpty) {
@@ -465,7 +472,9 @@ object EMLOCSV2RDF extends Anything2RDF {
       ANE(e,DCTerms.description,w(h("activity_name")))
       ANE(e,RDFS.comment,w(h("activity_description")))
       val atype = w(h("activity_type_id"))
-      val atypeC = I(sns+"activityType_"+encode(atype),Map("en"->atype),OWL.Class)
+      val aname = unCamelCase(atype)
+      activityTypeNameMap.put(w(h("id")),aname)
+      val atypeC = I(sns+"activityType_"+encode(atype),Map("en"->aname),OWL.Class)
       atypeC.addProperty(RDFS.subClassOf,CIDOC.Activity)
       e.addProperty(RDF.`type`,atypeC)
     }
@@ -476,7 +485,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     println(headers.toSeq)
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("activity_id")))
-      val l = R(ns+"location_"+w(h("location_id")))
+      val l = R(getUUIDURI("cofk_union_location-"+w(h("location_id"))))
       e.addProperty(CIDOC.took_place_at,l)
     }
 //id,location_id,change_timestamp,activity_id   
@@ -484,24 +493,31 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
-    for (w <- wr) {
-      val e = R(ns+"activity_"+w(h("activity_id")))
-      val p = R(ns+"person_"+w(h("person_id")))
-      e.addProperty(CIDOC.had_participant,p)
-    }
+    val activityPrimaryPersonNameMap = new HashMap[String,String]
+    for (w <- wr) 
+      if (!personNameMap.contains(w(h("person_id")))) logger.warn("Unknown person: "+w.toSeq)
+      else {
+        val e = R(ns+"activity_"+w(h("activity_id")))
+        e.addProperty(SKOS.prefLabel,activityTypeNameMap(w(h("activity_id")))+" of "+personNameMap(w(h("person_id"))),"en")
+        val p = personIdMap(w(h("person_id")))
+        activityPrimaryPersonNameMap.put(w(h("activity_id")),personNameMap(w(h("person_id"))))
+        e.addProperty(CIDOC.had_participant,p)
+      }
 //id,person_id,change_timestamp,activity_id
     wr = CSVReader("pro_role_in_activity.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
-    for (w <- wr) {
-      val a = R(ns+w(h("entity_type")).toLowerCase+'_'+w(h("person_id")))
+    for (w <- wr) if (!personIdMap.contains(w(h("entity_id")))) logger.warn("Unknown entity: "+w.toSeq) else {
+      val a = personIdMap(w(h("entity_id")))
       val r = R(sns+"role_"+w(h("role_id")))
+      val roleName = unCamelCase(w(h("role_id")))
       val e = R(ns+"activity_"+w(h("activity_id")))
-      val as = I(ns+"role_in_activity_"+w(h("id")),"",PROV.Association)
+      val as = I(ns+"role_in_activity_"+w(h("id")),personNameMap(w(h("entity_id")))+" as "+roleName+" in the "+activityTypeNameMap(w(h("activity_id")))+" of "+activityPrimaryPersonNameMap(w(h("activity_id"))),PROV.Association)
       as.addProperty(PROV.agent,a)
       as.addProperty(PROV.hadRole,r)
       e.addProperty(PROV.qualifiedAssociation,as)
+      e.addProperty(CIDOC.had_participant,a)
     }
 //id,entity_type,entity_id,role_id,change_timestamp,activity_id
     wr = CSVReader("pro_relationship.csv")
@@ -509,10 +525,41 @@ object EMLOCSV2RDF extends Anything2RDF {
     h = headers.zipWithIndex.toMap
     println(headers.toSeq)
     for (w <- wr) {
-      val s = R(ns+w(h("subject_type")).toLowerCase+'_'+w(h("subject_id")))
-      val o = R(ns+w(h("object_type")).toLowerCase+'_'+w(h("object_id")))
+      val s = personIdMap(w(h("subject_id")))
+      val o = personIdMap(w(h("object_id")))
       s.addProperty(P(sns+w(h("relationship_id"))),o)
     }
+    wr = CSVReader("pro_textual_source.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    println(headers.toSeq)
+    val sourceNameMap = new HashMap[String,String]
+    for (w <- wr) {
+      val s = I(ns+"source_"+w(h("id")),w(h("title")),CIDOC.Document)
+      if(!w(h("author")).isEmpty)
+        s.addProperty(DCTerms.creator,I(ns+"person_"+encode(w(h("author"))),w(h("author")),CIDOC.Person))
+      val title = w(h("title")).trim
+      sourceNameMap.put(w(h("id")),title)
+      ANE(s,DCTerms.title,title)
+      ANE(s,P(sns+"chapterArticleTitle"),w(h("chapterArticleTitle")))
+      ANE(s,BIBO.volume,w(h("volumeSeriesNumber")))
+      ANE(s,BIBO.issue,w(h("issueNumber")))
+      ANE(s,BIBO.pages,w(h("pageNumber")))
+      if (!w(h("editor")).isEmpty)
+        s.addProperty(BIBO.editor,I(ns+"person_"+encode(w(h("editor"))),w(h("editor")),CIDOC.Person))
+      ANE(s,DCTerms.date,w(h("datePublication")))
+      ANE(s,FOAF.page,w(h("urlResource")))
+      ANE(s,BIBO.shortTitle,w(h("abbreviation")))
+      ANE(s,DCTerms.description,w(h("fullBibliographicDetails")))
+      ANE(s,BIBO.edition,w(h("edition")))
+      ANE(s,P(sns+"reprintFacsimile"),w(h("reprintFacsimile")))
+      ANE(s,P(sns+"repository"),w(h("repository")))
+    }
+//id,author,title,chapterArticleTitle,volumeSeriesNumber,issueNumber,pageNumber,editor,
+//placePublication,datePublication,urlResource,abbreviation,fullBibliographicDetails,
+//edition,reprintFacsimile,repository,creation_user,creation_timestamp,change_user,
+//change_timestamp    
+    
 //id,subject_id,subject_type,subject_role_id,relationship_id,object_id,
 //object_type,object_role_id,change_timestamp,activity_id
     wr = CSVReader("pro_assertion.csv")
@@ -522,24 +569,13 @@ object EMLOCSV2RDF extends Anything2RDF {
     for (w <- wr) {
       val a = R(ns+"activity_"+w(h("assertion_id")))
       val s = if (!w(h("source_description")).trim.isEmpty) {
-        val s = I(ns+"source_"+w(h("source_id"))+"_"+encode(w(h("source_description")).trim),"",CIDOC.Document)
+        val s = I(ns+"source_"+w(h("source_id"))+"_"+encode(w(h("source_description")).trim),sourceNameMap(w(h("source_id")))+", "+w(h("source_description")),CIDOC.Document)
         s.addProperty(DCTerms.description,w(h("source_description")))
         s.addProperty(DCTerms.isPartOf,R(ns+"source_"+w(h("source_id"))))
       } else R(ns+"source_"+w(h("source_id")))
       a.addProperty(CIDOC.is_documented_in,s)
     }
 //id,assertion_type,assertion_id,source_id,source_description,change_timestamp    
-    wr = CSVReader("pro_textual_source.csv")
-    headers = wr.next
-    h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
-    for (w <- wr) {
-      val s = I(ns+"source_"+w(h("id")),"",CIDOC.Document)
-    }
-//id,author,title,chapterArticleTitle,volumeSeriesNumber,issueNumber,pageNumber,editor,
-//placePublication,datePublication,urlResource,abbreviation,fullBibliographicDetails,
-//edition,reprintFacsimile,repository,creation_user,creation_timestamp,change_user,
-//change_timestamp    
     m.setNsPrefixes(PrefixMapping.Standard)
     m.setNsPrefix("org",ORG.ns)
     m.setNsPrefix("dcterms",DCTerms.NS)
