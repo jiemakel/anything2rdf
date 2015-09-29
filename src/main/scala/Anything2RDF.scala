@@ -125,7 +125,13 @@ abstract class Anything2RDF extends LazyLogging {
     r.addProperty(RDF.`type`,c)
     r
   }
-  
+
+  def I(uri: String, c : Resource): Resource = {
+    val r = m.createResource(uri)
+    r.addProperty(RDF.`type`,c)
+    r
+  }
+
   def I(uri: String, label : String, c : Resource): Resource = {
     val r = m.createResource(uri)
     r.addProperty(SKOS.prefLabel,label)
