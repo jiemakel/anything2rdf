@@ -27,7 +27,7 @@ import scala.collection.mutable.ArrayBuffer
 
 object PNR2RDF extends Anything2RDF {
 
-  val sns = "http://ldf.fi/pnr-schema#"
+  val sns = "http://ldf.fi/pnr/schema#"
   val ns = "http://ldf.fi/pnr/"
   
   val PlaceType = I(sns+"PlaceType",Map("fi"->"Paikkatyyppi","en"->"Place Type"),OWL.Class)
