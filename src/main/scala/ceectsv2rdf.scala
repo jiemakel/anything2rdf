@@ -62,6 +62,7 @@ object CEECCSV2RDF extends Anything2RDF {
       
   val Education = EC("Education")
   val education = EOP("education")
+  val educationDetails = EDP("education details")
   val uncertainEducation = EOP("uncertain education")
   
   val Higher = I(ns+"Education_H",Map("en"->"Higher"),Education)
@@ -122,6 +123,7 @@ HI (higher: inns of court), HO (higher: oxford), PC (private/self: classical), P
       
   val Migration = EC("Migration")
   val migration = EOP("migration")
+  val migrationDetails = EDP("migration details")
   val MigM = Map('Y'->I(ns+"Migration_Y",Map("en"->"Yes"),Migration),
       'L'->I(ns+"Migration_L",Map("en"->"London"),Migration),
       'A'->I(ns+"Migration_A",Map("en"->"Abroad"),Migration))
@@ -169,14 +171,21 @@ näistä (kentän sisältöä ei tarkisteta)*/
         case ("FatherRank",v) => if (v.endsWith("?")) p.addProperty(uncertainFatherRank,RankM(v.substring(0,v.length-1)))
         else p.addProperty(fatherRank,RankM(v))
         case (prop,"?") =>
+        case ("Education",v) => p.addProperty(educationDetails,v)
+        case ("Migration",v) => p.addProperty(migrationDetails,v)
         case (prop,"Y") => p.addLiteral(EDP(prop),true)
         case (prop,"N") => p.addLiteral(EDP(prop),false)
-        case (k,v) => p.addProperty(EDP(k),v)
+        case (k,v) => p.addProperty(EDP(k.charAt(0).toLower+k.substring(1)),v)
       }
     }
     wr = CSVDictReader("database_letter.txt")(CSVReaderSettings.Standard.copy(separator='\t',quotechar='|'))
     for (r <- wr) {
-      val p = I(ns+"letter_"+encode(r("LetterID")),Map("en"->(r("SenderFirstName")+" "+r("SenderLastName")+" to "+r("RecipientFirstName")+" "+r("RecipientLastName")+" on "+r("LetterDate"))),Letter)
+      var label = r("SenderFirstName")+" "+r("SenderLastName")+" to "+r("RecipientFirstName")+" "+r("RecipientLastName")
+      if (!r("LetterDate").isEmpty()) {
+        label += " on "+r("LetterDate")+", "
+      } else label +=" in "
+      label += r("Year")
+      val p = I(ns+"letter_"+encode(r("LetterID")),Map("en"->(label)),Letter)
       r.foreach { 
         case (k,"") => 
         case ("Authenticity",v) => 
