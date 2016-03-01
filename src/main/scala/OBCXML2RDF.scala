@@ -16,8 +16,13 @@ import com.bizo.mighty.csv.CSVDictReader
 import com.bizo.mighty.csv.CSVReaderSettings
 import scala.io.Source
 import com.hp.hpl.jena.sparql.vocabulary.FOAF
+import scala.xml.pull.XMLEventReader
+import scala.xml.pull.EvElemStart
+import scala.xml.pull.EvText
+import scala.xml.pull.EvElemEnd
+import scala.xml.MetaData
 
-object CEECCSV2RDF extends Anything2RDF {
+object OBCXML2RDF extends Anything2RDF {
   
   val sns = "http://ldf.fi/ceec-schema#"
   val ns = "http://ldf.fi/ceec/"
@@ -101,6 +106,8 @@ HI (higher: inns of court), HO (higher: oxford), PC (private/self: classical), P
       "O"->I(ns+"Region_O",Map("en"->"Other"),Region),
       "A"->I(ns+"Region_A",Map("en"->"Abroad"),Region))
   
+  val Role = EC("Role")
+  val roleP = EOP("role")
   val Rank = EC("Rank")
   val uncertainRank = EOP("uncertain rank")
   val rank = EOP("rank")
@@ -127,6 +134,10 @@ HI (higher: inns of court), HO (higher: oxford), PC (private/self: classical), P
   val MigM = Map('Y'->I(ns+"Migration_Y",Map("en"->"Yes"),Migration),
       'L'->I(ns+"Migration_L",Map("en"->"London"),Migration),
       'A'->I(ns+"Migration_A",Map("en"->"Abroad"),Migration))
+      
+  val Occupation = EC("Occupation")
+  val occupationP = EOP("occupation")
+  val occupationDetailsP = EDP("occupation details")
       /*
       Sex: F (female), M (male)
 2. Region / PBirth: N (north), F (east anglia), H (home counties), L (london), C (court),
@@ -147,85 +158,61 @@ HI (higher: inns of court), HO (higher: oxford), PC (private/self: classical), P
 ficial), W (other), L (love), D (duty), T (travel), F (family) - mikä tahansa yhdistelmä
 näistä (kentän sisältöä ei tarkisteta)*/
   
+  val yearP = EDP("year")
+  val wordcountP = EDP("wordcount")
+      
+  def get(key: String)(implicit attrs: MetaData): Option[String] = {
+    if (attrs(key)!=null && attrs(key)(0).text!="") Some(attrs(key)(0).text.trim)
+    else None
+  }
+      
   def main(args: Array[String]): Unit = {
-    var wr = CSVDictReader("database_person.txt")(CSVReaderSettings.Standard.copy(separator='\t',quotechar='|'))
-    for (r <- wr) {
-      val p = I(ns+"person_"+encode(r("PersonCode")),r("FirstName")+" "+r("LastName"),CIDOC.Person)
-      r.foreach { 
-        case (k,"") => 
-        case ("PersonCode",v) =>
-        case ("SocMob",v) => p.addProperty(socialMobility,SM(v))
-        case ("Religion",v) => p.addProperty(religion,RelM(v))
-        case ("EduCode",v) => {
-          val (v2,prop) = if (v.endsWith("?")) (v.substring(0,v.length-1),uncertainEducation) else (v,education)
-          if (v2.startsWith("H") && v2.length>1) v2.substring(1).foreach(c => p.addProperty(prop,EduM(""+c)))
-          else p.addProperty(prop,EduM(v2)) 
-        }
-        case ("MigCode",v) => v.foreach(v => p.addProperty(migration,MigM(v)))
-        case ("Region",v) => p.addProperty(region,RegionM(v))
-        case ("PBirth",v) => p.addProperty(pbirth,RegionM(v))
-        case ("Sex","M") => p.addProperty(FOAF.gender,SDMXCode.sexMale)
-        case ("Sex","F") => p.addProperty(FOAF.gender,SDMXCode.sexFemale)
-        case ("Rank",v) => if (v.endsWith("?")) p.addProperty(uncertainRank,RankM(v.substring(0,v.length-1)))
-        else p.addProperty(rank,RankM(v))
-        case ("FatherRank",v) => if (v.endsWith("?")) p.addProperty(uncertainFatherRank,RankM(v.substring(0,v.length-1)))
-        else p.addProperty(fatherRank,RankM(v))
-        case (prop,"?") =>
-        case ("Education",v) => p.addProperty(educationDetails,v)
-        case ("Migration",v) => p.addProperty(migrationDetails,v)
-        case (prop,"Y") => p.addLiteral(EDP(prop),true)
-        case (prop,"N") => p.addLiteral(EDP(prop),false)
-        case (k,v) => p.addProperty(EDP(k.charAt(0).toLower+k.substring(1)),v)
-      }
-    }
-    wr = CSVDictReader("database_letter.txt")(CSVReaderSettings.Standard.copy(separator='\t',quotechar='|'))
-    for (r <- wr) {
-      var label = r("SenderFirstName")+" "+r("SenderLastName")+" to "+r("RecipientFirstName")+" "+r("RecipientLastName")
-      if (!r("LetterDate").isEmpty()) {
-        label += " on "+r("LetterDate")+", "
-      } else label +=" in "
-      label += r("Year")
-      val p = I(ns+"letter_"+encode(r("LetterID")),Map("en"->(label)),Letter)
-      r.foreach { 
-        case (k,"") => 
-        case ("Authenticity",v) => 
-          if (v.endsWith("?")) v.substring(0,v.length-1).foreach(c => p.addProperty(uncertainAuthenticity,authenticityM(c))) 
-          else v.foreach(c => p.addProperty(authenticity,authenticityM(c)))
-        case ("LetterID",v) =>
-        case ("Place",v) => v.split(",").map(_.trim.replace("\\W*$","")).foldRight(None:Option[Resource]) { (lv,sp) => 
-          val cp = I(ns+"place_"+encode(lv),lv,CIDOC.Place)
-          sp.foreach { cp2 => cp.addProperty(CIDOC.place_falls_within,cp2) }
-          Some(cp) }.foreach{place => 
-            place.addProperty(SKOS.altLabel,v)
-            p.addProperty(CIDOC.took_place_at,place)
+    var speechId = 1
+    for (file <- new java.io.File("obc_clear/").listFiles) {
+      println("Processing: "+file)
+      val xml = new XMLEventReader(Source.fromFile(file,"ISO-8859-1"))
+      var header = ""
+      while (xml.hasNext) xml.next match {
+        case EvElemStart(_,"header", _, _) => header=xml.next.asInstanceOf[EvText].text
+        case EvElemStart(_,"speech", attrs, _) =>
+          implicit val iattrs = attrs
+          if (attrs("obc-spi")!=null && attrs("obc-yea")!=null) { 
+            val speakerId = attrs("obc-spi")(0).text.trim
+            val speakerName = get("obc-prn").orElse(get("obc-pbl"))
+            val year = attrs("obc-yea")(0).text.trim
+            val gender = get("obc-sex")
+            val role = get("obc-rol")
+            val occupation1Id = get("obc-hc1")
+            val occupation1Label = get("obc-hl1")
+            val occupation1Detail = get("obc-oc1")
+            val occupation2Id = get("obc-hc2")
+            val occupation2Label = get("obc-hl2")
+            val occupation2Detail = get("obc-oc2")
+            val speech = I(ns+"speech_"+speechId,Map("en"->(speakerName.getOrElse("?")+ " in "+header)), Letter)
+            val speaker = I(ns+"speaker_"+speakerId,speakerName.getOrElse("?"),CIDOC.Person)
+            speech.addProperty(yearP,year)
+            speech.addProperty(CIDOC.custody_surrendered_by,speaker)
+            gender.foreach { g => speaker.addProperty(FOAF.gender,if (g == "f") SDMXCode.sexFemale else SDMXCode.sexMale) }
+            role.foreach { r => speech.addProperty(roleP,I(ns+"role_"+encode(r),Map("en"->r), Role)) }
+            occupation1Id.foreach { r => speaker.addProperty(occupationP, I(ns+"occupation_"+encode(r),Map("en"->occupation1Label.getOrElse(occupation1Detail.get)), Occupation)) }
+            occupation1Detail.foreach { r => speaker.addProperty(occupationDetailsP, r) }
+            occupation2Id.foreach { r => speaker.addProperty(occupationP, I(ns+"occupation_"+encode(r),Map("en"->occupation2Label.getOrElse(occupation2Detail.get)), Occupation)) }
+            occupation2Detail.foreach { r => speaker.addProperty(occupationDetailsP, r) }
+            speechId+=1
+            var t: String = ""
+            var break: Boolean = false
+            while (!break && xml.hasNext) xml.next match {
+              case EvText(text) => t+=text
+              case EvElemEnd(_,"speech") => break=true
+              case _ => 
+            }
+            speech.addProperty(fullText,t)
+            speech.addProperty(wordcountP,""+ ("\\s+".r.findAllIn(t).length))
           }
-        case ("Sender",v) => p.addProperty(CIDOC.custody_surrendered_by,R(ns+"person_"+encode(v)))
-        case ("Recipient",v) => p.addProperty(CIDOC.custody_received_by,R(ns+"person_"+encode(v)))
-        case ("RelCode",v) => p.addProperty(relationshipCode,RM(v))
-        case ("RecRank",v) => if (v.endsWith("?")) p.addProperty(uncertainRecRank,RankM(v.substring(0,v.length-1)))
-        else p.addProperty(recRank,RankM(v))
-        case ("SenderRank",v) => if (v.endsWith("?")) p.addProperty(uncertainSenderRank,RankM(v.substring(0,v.length-1)))
-        else p.addProperty(senderRank,RankM(v))
-        case (prop,"Y") => p.addLiteral(EDP(prop),true)
-        case (prop,"N") => p.addLiteral(EDP(prop),false)
-        case (prop,"?") =>
-        case (k,v) => p.addProperty(EDP(k),v)
+        case _ => 
       }
     }
-    val sb = new StringBuilder()    
-    var clid = ""
-    for(line <- Source.fromFile("texts_plain.txt").getLines) {
-      if (line.startsWith("<L")) {
-        if (clid!="") R(ns+"letter_"+encode(clid)).addProperty(fullText,sb.toString(),"en")
-        clid = line.substring(3,line.length-1)
-        sb.clear()
-      } else {
-       sb.append(line)
-       sb.append('\n')
-      }
-    }
-    R(ns+"letter_"+encode(clid)).addProperty(fullText,sb.toString(),"en")
-    RDFDataMgr.write(new FileOutputStream("ceec.nt"), m, RDFFormat.NT)
+    RDFDataMgr.write(new FileOutputStream("obc.nt"), m, RDFFormat.NT)
     
   }
 }
