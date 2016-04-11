@@ -24,6 +24,7 @@ import scala.collection.mutable.Buffer
 import scala.util.control.Breaks._
 import com.hp.hpl.jena.rdf.model.Property
 import scala.util.Try
+import org.apache.jena.iri.IRIFactory
 
 object EMLOCSV2RDF extends Anything2RDF {
 
@@ -107,6 +108,24 @@ object EMLOCSV2RDF extends Anything2RDF {
   def getUUIDURI(id : String)(implicit uuidMap: HashMap[String,String]) : String = {
     ns+uuidMap.getOrElse(id,id)
   }
+  
+  def iriFix(iri: String): String = {
+    val ret = new StringBuilder()
+    for (char <- iri) char match {
+      case ' ' => ret.append("%20")
+      case '<' => ret.append("%3C")
+      case '>' => ret.append("%3E")
+      case '"' => ret.append("%22")
+      case '{' => ret.append("%7B")
+      case '}' => ret.append("%7D")
+      case '|' => ret.append("%7C")
+      case '\\' => ret.append("%5C")
+      case '^' => ret.append("%5E")
+      case '`' => ret.append("%60")
+      case _ => ret.append(char)
+    }
+    ret.toString()
+  }
 
   def main(args: Array[String]): Unit = {
     var wr : CSVReader = null
@@ -115,7 +134,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_image.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val imageMap = new HashMap[String,Resource]
     breakable { for (w <- wr) {
       val i = m.createResource(w(h("image_filename")))
@@ -129,19 +147,25 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_resource.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     breakable { for (w <- wr) {
-      val iri = if (!w(h("resource_url")).trim.isEmpty) w(h("resource_url")) else ns+w(h("resource_id"))
+      val iri = if (!w(h("resource_url")).trim.isEmpty) {
+        val iri2 = iriFix(w(h("resource_url")).trim)
+        val violations = IRIFactory.iriImplementation().create(iri2).violations(false)
+        if (violations.hasNext) {
+          var violationMessage=""
+          while (violations.hasNext) violationMessage+=violations.next.getShortMessage+", "
+          logger.warn("Bad URL: "+w(h("resource_url"))+"("+violationMessage+")")
+          ns+w(h("resource_id")) 
+        } else iri2
+      } else ns+w(h("resource_id"))
       val res = I(iri,w(h("resource_name")),CIDOC.Information_Object)
       resourceMap.put(w(h("resource_id")),res)
       if (!w(h("resource_details")).trim.isEmpty) res.addProperty(DCTerms.license,w(h("resource_details")))
-
     }}
     val manifestationWorkMap = new HashMap[String,String]
     wr = CSVReader("cofk_union_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val ind = h("relationship_type")
     val liv = h("left_id_value")
     val riv = h("right_id_value")
@@ -153,7 +177,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val workNameMap = new HashMap[String,String]
     val workMetadataMap = new HashMap[String,Metadata]
     breakable { for (w <- wr) {
@@ -229,7 +252,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_manifestation.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val manifestationMap = new HashMap[String,Resource]
     breakable { for (w <- wr) if (!manifestationWorkMap.contains(w(h("manifestation_id")))) logger.warn(s"Manifestation ${w(h("manifestation_id"))} is a manifestation of no work!") else {
       val t = EC(w(h("manifestation_type")))
@@ -275,7 +297,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     breakable { for (w <- wr) {
         w(ind) match {
           case "cofk_union_relationship_type-created" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(getUUIDURI(w(riv))))
@@ -294,7 +315,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val locationMap = new HashMap[String,Resource]()
     val locationFNMap = new HashMap[String,Resource]()
     breakable { for (w <- wr) {
@@ -325,7 +345,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_institution.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     breakable { for (w <- wr) {
       val i = I(getUUIDURI(w(h("institution_id"))),w(h("institution_name")),CIDOC.Legal_Body)
       w(h("institution_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach(n => i.addProperty(SKOS.altLabel,n))
@@ -364,7 +383,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_person.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val personIdMap = new HashMap[String,Resource]
     val personNameMap = new HashMap[String,String]
     breakable { for (w <- wr) {
@@ -406,7 +424,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("cofk_union_relationship_type.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     breakable { for (w <- wr) {
       val p = I(sns+w(h("relationship_code")),Map("en"->w(h("desc_left_to_right"))),OWL.ObjectProperty)
       val ip = I(sns+w(h("relationship_code"))+"_inverse",Map("en"->w(h("desc_right_to_left"))),OWL.ObjectProperty)
@@ -418,7 +435,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_activity.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val activityTypeNameMap = new HashMap[String,String]
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("id")))
@@ -484,7 +500,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     for (w <- wr) {
       val e = R(ns+"activity_"+w(h("activity_id")))
       val l = R(getUUIDURI("cofk_union_location-"+w(h("location_id"))))
@@ -494,7 +509,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_primary_person.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val activityPrimaryPersonNameMap = new HashMap[String,String]
     for (w <- wr)
       if (!personNameMap.contains(w(h("person_id")))) logger.warn("Unknown person: "+w.toSeq)
@@ -509,7 +523,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_role_in_activity.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     for (w <- wr) if (!personIdMap.contains(w(h("entity_id")))) logger.warn("Unknown entity: "+w.toSeq) else {
       val a = personIdMap(w(h("entity_id")))
       val r = R(sns+"role_"+w(h("role_id")))
@@ -525,7 +538,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     for (w <- wr) {
       val s = personIdMap(w(h("subject_id")))
       val o = personIdMap(w(h("object_id")))
@@ -534,7 +546,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_textual_source.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     val sourceNameMap = new HashMap[String,String]
     for (w <- wr) {
       val s = I(ns+"source_"+w(h("id")),w(h("title")),CIDOC.Document)
@@ -567,7 +578,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     wr = CSVReader("pro_assertion.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
-    println(headers.toSeq)
     for (w <- wr) {
       val a = R(ns+"activity_"+w(h("assertion_id")))
       val s = if (!w(h("source_description")).trim.isEmpty) {
