@@ -118,6 +118,8 @@ object EMLOCSV2RDF extends Anything2RDF {
       case '"' => ret.append("%22")
       case '{' => ret.append("%7B")
       case '}' => ret.append("%7D")
+      case '[' => ret.append("%5B")
+      case ']' => ret.append("%5D")
       case '|' => ret.append("%7C")
       case '\\' => ret.append("%5C")
       case '^' => ret.append("%5E")
