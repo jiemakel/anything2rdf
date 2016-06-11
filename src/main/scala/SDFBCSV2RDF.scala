@@ -166,7 +166,6 @@ object SDFBCSV2RDF extends Anything2RDF {
     //headers = wr.next
     wr.next
     //h = headers.zipWithIndex.toMap
-    val lm = new HashMap[String,Property]
     lm.dropRight(1).foreach(p => {
       val i = I(sns+"relationship_"+p._1+"_knows",Map("en"->(p._2+"knows")),OWL.ObjectProperty)
       i.addProperty(OWL.inverseOf,i)
