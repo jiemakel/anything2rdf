@@ -37,10 +37,14 @@ object SDFBCSV2RDF extends Anything2RDF {
   val suffixP = EDP("suffix")
   val propertyP = EOP("property")
   val probabilityP = EDP("probability")
+  val birthDateP = EOP("date of birth")
+  val approximateBirthDateP = EOP("approximate date of birth")
+  val deathDateP = EOP("date of death")
+  val approximateDeathDateP = EOP("approximate date of death")
   val approximateTimeSpan = EOP("approximate time span")
   val qualifiedAssociationP = EOP("qualified assocation")
   
-  def makeTimeSpan(startQualifier: String, startYear: String, endQualifier: String, endYear: String): Option[Resource] = {
+  def makeTimeSpan(startQualifier: String, startYear: String, endQualifier: String, endYearP: String): Option[Resource] = {
     var bob, eoe, eob, boe: Option[String] = None
     if (startYear!="") startQualifier match {
       case "AF/IN" => bob = Some(makeDateTime(startYear, "", "")._1)
@@ -52,6 +56,7 @@ object SDFBCSV2RDF extends Anything2RDF {
         bob = Some(dt._1)
         eob = Some(dt._2)
     }
+    val endYear = if (endYearP!="NA") endYearP else startYear
     if (endYear!="") endQualifier match {
       case "AF/IN" => boe = Some(makeDateTime(endYear, "", "")._1)
       case "AF" => boe = Some(makeDateTime(endYear, "", "")._2)
@@ -203,6 +208,26 @@ object SDFBCSV2RDF extends Anything2RDF {
         case oth => logger.warn("Unknown gender "+oth+" for "+w.mkString(", "))
       }
       ANE(i,DCTerms.description,w(10),"en")
+      (w(12),w(13)) match {
+        case ("11/2/1715",_) => makeTimeSpan(w(11),"1715","November","2",w(11),"1715","November","2").foreach(ts => i.addProperty(birthDateP,ts))
+        case ("9/8/1693",_) => makeTimeSpan(w(11),"1693","September","9",w(11),"1693","September","9").foreach(ts => i.addProperty(birthDateP,ts))
+        case _ =>
+          makeTimeSpan(w(11),w(12),w(11),w(13)).foreach(ts =>
+              if (w(11)=="CA") i.addProperty(approximateBirthDateP,ts) 
+              else i.addProperty(birthDateP,ts))
+      }
+      (w(15),w(16)) match {
+        case (_,"January 1, 1678") => makeTimeSpan(w(14),w(15),"January","1",w(14),w(15),"January","1").foreach(ts => i.addProperty(deathDateP,ts))
+        case ("1710/11",_) => makeTimeSpan(w(14),"1710","November","",w(14),"1710","November","").foreach(ts => i.addProperty(deathDateP,ts))
+        case (_,"after 1621") => makeTimeSpan(w(14),"1621",w(14),"1621").foreach(ts => i.addProperty(deathDateP,ts))
+        case ("1738/10/12",_) => makeTimeSpan(w(14),"1738","October","12",w(14),"1738","October","12").foreach(ts => i.addProperty(deathDateP,ts))
+        case ("1785/11/2",_) => makeTimeSpan(w(14),"1785","November","2",w(14),"1785","November","2").foreach(ts => i.addProperty(deathDateP,ts))
+        case ("1750/4/22",_) => makeTimeSpan(w(14),"1750","April","22",w(14),"1750","April","22").foreach(ts => i.addProperty(deathDateP,ts))
+        case _ =>   
+          makeTimeSpan(w(14),w(15),w(14),w(16)).foreach(ts =>
+              if (w(14)=="CA") i.addProperty(approximateDeathDateP,ts) 
+              else i.addProperty(deathDateP,ts))
+      }
     }
 
     //SDFB Group ID,Name,Description,Start Year Type,Start Year,End Year Type,End Year,Members List (Name with SDFB Person ID)
