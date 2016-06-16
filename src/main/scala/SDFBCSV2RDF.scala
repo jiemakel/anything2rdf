@@ -44,6 +44,12 @@ object SDFBCSV2RDF extends Anything2RDF {
   val approximateTimeSpan = EOP("approximate time span")
   val qualifiedAssociationP = EOP("qualified assocation")
   
+  val GroupType = EC("Group Type")
+  val groupTypeP = EOP("group type")
+
+  val RelationshipType = EC("Relationship Type")
+  val relationshipTypeP = EOP("relationship type")
+
   def makeTimeSpan(startQualifier: String, startYear: String, endQualifier: String, endYearP: String): Option[Resource] = {
     var bob, eoe, eob, boe: Option[String] = None
     if (startYear!="") startQualifier match {
@@ -165,35 +171,15 @@ object SDFBCSV2RDF extends Anything2RDF {
 
   def main(args: Array[String]): Unit = {
     var wr : CSVReader = null
-    //var headers: Array[String] = null
-    //var h: Map[String,Int] = null
-    wr = CSVReader("SDFB_RelationshipTypes.csv")
-    //headers = wr.next
-    wr.next
-    //h = headers.zipWithIndex.toMap
-    lm.dropRight(1).foreach(p => {
-      val i = I(sns+"relationship_"+p._1+"_knows",Map("en"->(p._2+"knows")),OWL.ObjectProperty)
-      i.addProperty(OWL.inverseOf,i)
-    })
-    for (w <- wr) {
-      lm.foreach(p => {
-        val i = I(sns+"relationship_"+p._1+"_"+w(0),Map("en"->(p._2+w(1))),OWL.ObjectProperty)
-        ANE(i,DCTerms.description,(p._2+w(2)),"en")
-        i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+p._1+"_"+w(3)))
-      })
-      val i = I(sns+"relationship_"+w(0),Map("en"->w(1)),OWL.ObjectProperty)
-      ANE(i,DCTerms.description,w(2),"en")
-      i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+w(3)))
-    }
 
+    wr = CSVReader("SDFB_people.csv")
+    wr.next
     //SDFB Person ID,ODNB ID,Display Name,Prefix,First Name,Last Name,Suffix,Title,All Search Names,Gender,Historical Significance,Birth Year Type,Extant Birth Year,Alternate Birth Year,Death Year Type,Extant Death Year,Alternate Death Year,Group List
     //10000023,42,John Abercromby,"",John,Abercromby,"","","John Abercromby, John, John Abercromby",male,Benedictine monk,BF,1561,1561,AF,1561,1561,[]
     //10010033,22932,Valentine Pyne,"",Valentine,Pyne,"","","Valentine Pyne, Valentine, Valentine Pyne",male,naval officer and soldier,IN,1603,1603,IN,1677,1677,[]
-    wr = CSVReader("SDFB_people.csv")
-    wr.next
-    val pidNameMap = new HashMap[String,String]
+    val pidNameMap = new HashMap[Long,String]
     for (w <- wr) {
-      pidNameMap.put(w(0),w(2))
+      pidNameMap.put(w(0).toLong,w(2))
       val i = I(ns+"person_"+w(0),Map("en"->w(2)),CIDOC.Person)
       ANE(i,odnbIdP, w(1))
       ANE(i,prefixP,w(3))
@@ -229,11 +215,28 @@ object SDFBCSV2RDF extends Anything2RDF {
               else i.addProperty(deathDateP,ts))
       }
     }
+    
+    wr = CSVReader("SDFB_PersonNotes.csv")
+    wr.next
+    //SDFB Contribution ID,Person ID,Note,Citation,Created By,Created At
+    //1,10050000,"Katherine Cullen was the ward, and later wife, of Henry Oxinden.  As his ward, she caused a minor scandal when she ran away to London. As his wife, her correspondence makes up a large portion of the Oxinden Letters held in the British Library.","",4,2015-04-08 18:07:07 UTC
+    for (w<- wr) {
+      val g = m.createResource(ns+"person_"+w(1)) 
+      g.addProperty(RDFS.comment,w(2),"en")
+      if (w(4)!="") {
+        val q = I(ns+"person_note_association_"+w(0),Map("en"->w(2)),RDF.Statement)
+        g.addProperty(qualifiedAssociationP,q)
+        q.addProperty(RDF.subject,g)
+        q.addProperty(RDF.predicate,RDFS.comment)
+        q.addProperty(RDF.`object`,w(2),"en")
+        q.addProperty(DCTerms.source,w(3))
+      }
+    }
 
+    wr = CSVReader("SDFB_groups.csv")
     //SDFB Group ID,Name,Description,Start Year Type,Start Year,End Year Type,End Year,Members List (Name with SDFB Person ID)
     //2,Participants in the Field of Cloth of Gold,Participants in the Field of Cloth of Gold,IN,1520,IN,1520,"[""Ralph Egerton (1476)""]"
     //57,Catholics,Catholics,BF,1400,AF,1800,"[""Mary Tudor (1516)"", ""Christopher Perkins (1542)"", ""Henry Tudor (1491)"", ""John Proctor (1521)""]"
-    wr = CSVReader("SDFB_groups.csv")
     wr.next
     var qac = 0l
     for (w <- wr) {
@@ -243,7 +246,7 @@ object SDFBCSV2RDF extends Anything2RDF {
         qac+=1
         val pid = "10000000".substring(0,"10000000".length-g.group(1).length)+g.group(1)
         val p = m.createResource(ns+"person_"+pid)
-        val q = I(ns+"person_group_association_"+qac,Map("en"->(pidNameMap(pid)+" was a member of "+w(1)+" "+makeTitle(w(3),w(4),"","",w(5),w(6),"",""))),RDF.Statement)
+        val q = I(ns+"person_group_association_"+qac,Map("en"->(pidNameMap(pid.toLong)+" was a member of "+w(1)+" "+makeTitle(w(3),w(4),"","",w(5),w(6),"",""))),RDF.Statement)
         p.addProperty(qualifiedAssociationP,q)
         q.addProperty(RDF.subject,p)
         q.addProperty(RDF.predicate,CIDOC.is_current_or_former_member_of)
@@ -254,29 +257,105 @@ object SDFBCSV2RDF extends Anything2RDF {
         p.addProperty(CIDOC.is_current_or_former_member_of,i)
       })
     }
-    qac = 0l
+    
+    wr = CSVReader("SDFB_GroupNotes.csv")
+    wr.next
+    //SDFB Contribution ID,Group ID,Note,Citation,Created By,Created At
+    //1,16,"Samuel Johnson wrote, ""The metaphysical poets were men of learning, and, to show their learning was their whole endeavour; but, unluckily resolving to show it in rhyme, instead of writing poetry, they only wrote verses, and, very often, such verses as stood the trial of the finger better than of the ear; for the modulation was so imperfect, that they were only found to be verses by counting the syllables... The most heterogeneous ideas are yoked by violence together; nature and art are ransacked for illustrations, comparisons, and allusions; their learning instructs, and their subtlety surprises; but the reader commonly thinks his improvement dearly bought, and, though he sometimes admires, is seldom pleased.""","Samuel Johnson, Lives of the Most Eminent English Poets, vol. 1 (1779)",10,2015-04-07 19:55:53 UTC
+    for (w<- wr) {
+      val g = m.createResource(ns+"group_"+w(1)) 
+      g.addProperty(RDFS.comment,w(2),"en")
+      if (w(4)!="") {
+        val q = I(ns+"group_note_association_"+w(0),Map("en"->w(2)),RDF.Statement)
+        g.addProperty(qualifiedAssociationP,q)
+        q.addProperty(RDF.subject,g)
+        q.addProperty(RDF.predicate,RDFS.comment)
+        q.addProperty(RDF.`object`,w(2),"en")
+        q.addProperty(DCTerms.source,w(3))
+      }
+    }
+    
+    wr = CSVReader("SDFB_GroupCategories.csv")
+    wr.next
+    //SDFB Group Category ID,Group Category Name,Description,Created By,Created At
+    //1,"Intellectual\n",,3,2015-02-25 00:51:20 UTC
+    for (w<-wr) {
+      val gc = I(ns+"groupType_"+w(0),Map("en"->w(1)),GroupType)
+      ANE(gc,DCTerms.description,w(2))
+    }
+    
+    wr = CSVReader("SDFB_GroupCategoryAssignments.csv")
+    wr.next
+    //SDFB Assignment ID,Group Category ID,Group ID,Created By,Created At
+    //1,1,1,3,2015-02-25 00:52:11 UTC
+    for (w<-wr)
+      m.createResource(ns+"group_"+w(2)).addProperty(groupTypeP,m.createResource(ns+"groupType_"+w(1)))
+    
+    wr = CSVReader("SDFB_RelationshipTypes.csv")
+    wr.next
+    //SDFB Relationship Type ID,Relationship Type Name,Description,Relationship Type Inverse,Created By,Created At
+    val relNameMap: HashMap[Long,String] = new HashMap[Long,String] 
+    for (w <- wr) {
+      lm.foreach(p => {
+        val i = I(sns+"relationship_"+p._1+"_"+w(0),Map("en"->(p._2+w(1))),OWL.ObjectProperty)
+        ANE(i,DCTerms.description,(p._2+w(2)),"en")
+        i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+p._1+"_"+w(3)))
+      })
+      relNameMap.put(w(0).toLong,w(1))
+      val i = I(sns+"relationship_"+w(0),Map("en"->w(1)),OWL.ObjectProperty)
+      ANE(i,DCTerms.description,w(2),"en")
+      i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+w(3)))
+    }
+    
+    wr = CSVReader("SDFB_RelationshipCategories.csv")
+    wr.next
+    //SDFB Relationship Category ID,Relationship Category Name,Description,Created By,Created At
+    //1,"Affective",,3,2015-02-25 00:51:33 UTC
+    for (w<-wr) {
+      val gc = I(ns+"relationshipType_"+w(0),Map("en"->w(1)),RelationshipType)
+      ANE(gc,DCTerms.description,w(2))
+    }
+    
+    wr = CSVReader("SDFB_RelCategoryAssignments.csv")
+    wr.next
+    //SDFB Assignment ID,Relationship Category ID,Relationship Type ID,Created By,Created At
+    //1,1,1,3,2015-02-25 00:52:00 UTC
+    for (w<-wr) lm.foreach(p => m.createResource(sns+"relationship_"+p._1+"_"+w(2)).addProperty(relationshipTypeP,m.createResource(ns+"relationshipType_"+w(1))))
+
+    val relMap: HashMap[Long,(Long,Long)] = new HashMap[Long,(Long,Long)] 
     for (file <- new File(".").listFiles().filter(_.getName.startsWith("SDFB_relationships_"))) {
       //SDFB Relationship ID,Person 1 ID,Person 2 ID,Original Confidence,Maximum Confidence,Start Year Type,Start Day,Start Month,Start Year,End Year Type,End Month,End Day,End Year
       //100000004,10000001,10012160,52,52,AF/IN,"",,1509,BF/IN,"",,1560
       //100000038,10000010,10000772,43,43,AF/IN,,,1595,BF/IN,,,1633
       wr = CSVReader(file.getName)
       wr.next
-      for (w <- wr) {
-        val p1 = m.createResource(ns+"person_"+w(1))
-        val p2 = m.createResource(ns+"person_"+w(2))
-        val (id, certaintyDescription) = toDescriptiveCertainty(w(4).toInt)
-        val p = if (id==100) FOAF.knows else P(sns+"relationship_"+id+"_knows")
-        qac+=1
-        val q = I(ns+"person_person_association_"+qac,Map("en"->(pidNameMap(w(1))+" "+certaintyDescription+"knew "+pidNameMap(w(2))+" "+makeTitle(w(5),w(7),w(6),w(8),w(9),w(12),w(10),w(11)))),RDF.Statement)
-        p1.addProperty(qualifiedAssociationP,q)
-        q.addProperty(RDF.subject,p1)
-        q.addProperty(RDF.predicate,p)
-        q.addProperty(RDF.`object`,p2)
-        q.addProperty(probabilityP,w(3),XSDDatatype.XSDdecimal)
-        makeTimeSpan(w(5),w(7),w(6),w(8),w(9),w(12),w(10),w(11)).foreach(ts =>
-          if (w(3)=="CA" || w(5)=="CA") q.addProperty(approximateTimeSpan,ts) 
-          else q.addProperty(CIDOC.has_timeSpan,ts))
-        p1.addProperty(p,p2)
+      for (w <- wr)
+        relMap.put(w(0).toLong,(w(1).toLong,w(2).toLong))
+    }
+    
+    for (file <- new File(".").listFiles().filter(_.getName.startsWith("SDFB_RelTypeAssignments_"))) {
+      wr = CSVReader(file.getName)
+      if (wr.hasNext()) {
+        wr.next
+        //SDFB Relationship Type Assignment ID,SDFB Relationship ID,SDFB Relationship Type ID,Confidence,Start Year Type,Start Month,Start Day,Start Year,End Date Type,End Month,End Day,End Year
+        //13,100165527,15,100,IN,May,29,1630,IN,February,13,1662
+        for (w <- wr) {
+          val people = relMap(w(1).toLong)
+          val p1 = m.createResource(ns+"person_"+people._1)
+          val p2 = m.createResource(ns+"person_"+people._2)
+          val (id, certaintyDescription) = toDescriptiveCertainty(w(3).toInt)
+          val p = P(sns+"relationship_"+id+"_"+w(2))
+          val q = I(ns+"person_person_association_"+w(0),Map("en"->(pidNameMap(people._1)+" "+certaintyDescription+relNameMap(w(2).toLong)+" "+pidNameMap(people._2)+" "+makeTitle(w(4),w(7),w(5),w(6),w(8),w(11),w(9),w(10)))),RDF.Statement)
+          p1.addProperty(qualifiedAssociationP,q)
+          q.addProperty(RDF.subject,p1)
+          q.addProperty(RDF.predicate,p)
+          q.addProperty(RDF.`object`,p2)
+          q.addProperty(probabilityP,w(3),XSDDatatype.XSDdecimal)
+          makeTimeSpan(w(4),w(7),w(5),w(6),w(8),w(11),w(9),w(10)).foreach(ts =>
+            if (w(4)=="CA" || w(8)=="CA") q.addProperty(approximateTimeSpan,ts) 
+            else q.addProperty(CIDOC.has_timeSpan,ts))
+          p1.addProperty(p,p2)
+        }
       }
     }
     m.setNsPrefixes(PrefixMapping.Standard)
