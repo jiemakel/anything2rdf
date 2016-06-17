@@ -119,6 +119,10 @@ object SDFBCSV2RDF extends Anything2RDF {
       }
       sb.append(startYear)
       sb.append(' ')
+      if (startQualifier==endQualifier && startYear==endYear && startMonth==endMonth && startDate==endDate) {
+        sb.setLength(sb.length-1)
+        return sb.toString
+      }
     }
     sb.append('-')
     if (endYear!="") {
@@ -297,7 +301,7 @@ object SDFBCSV2RDF extends Anything2RDF {
     val relNameMap: HashMap[Long,String] = new HashMap[Long,String] 
     for (w <- wr) {
       lm.foreach(p => {
-        val i = I(sns+"relationship_"+p._1+"_"+w(0),Map("en"->(p._2+w(1))),OWL.ObjectProperty)
+        val i = I(sns+"relationship_"+p._1+"_"+w(0),Map("en"->(p._2+w(1).toLowerCase)),OWL.ObjectProperty)
         ANE(i,DCTerms.description,(p._2+w(2)),"en")
         i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+p._1+"_"+w(3)))
       })
@@ -339,6 +343,9 @@ object SDFBCSV2RDF extends Anything2RDF {
         wr.next
         //SDFB Relationship Type Assignment ID,SDFB Relationship ID,SDFB Relationship Type ID,Confidence,Start Year Type,Start Month,Start Day,Start Year,End Date Type,End Month,End Day,End Year
         //13,100165527,15,100,IN,May,29,1630,IN,February,13,1662
+        //SDFB Relationship Type Assignment ID,SDFB Relationship ID,SDFB Relationship Type ID,Confidence,Start Date Type,Start Month,Start Day,Start Year,End Date Type,End Month,End Day,End Year,Justification,Citation,Created By ID,Created At,Is approved?,Approved By ID,Approved On
+        //13,100165527,15,100,IN,May,29,1630,IN,February,13,1662,"Nadine Akkerman, ed., The Correspondence of Elizabeth Stuart, Queen of Bohemia, (Oxford: Oxford University Press, 2011)","",4,2015-03-12 01:50:47 UTC,true,4,2015-09-24
+
         for (w <- wr) {
           val people = relMap(w(1).toLong)
           val p1 = m.createResource(ns+"person_"+people._1)
@@ -351,6 +358,8 @@ object SDFBCSV2RDF extends Anything2RDF {
           q.addProperty(RDF.predicate,p)
           q.addProperty(RDF.`object`,p2)
           q.addProperty(probabilityP,w(3),XSDDatatype.XSDdecimal)
+          ANE(q,DCTerms.source,w(11))
+          ANE(q,DCTerms.source,w(12))
           makeTimeSpan(w(4),w(7),w(5),w(6),w(8),w(11),w(9),w(10)).foreach(ts =>
             if (w(4)=="CA" || w(8)=="CA") q.addProperty(approximateTimeSpan,ts) 
             else q.addProperty(CIDOC.has_timeSpan,ts))
