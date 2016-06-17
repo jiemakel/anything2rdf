@@ -301,8 +301,8 @@ object SDFBCSV2RDF extends Anything2RDF {
         ANE(i,DCTerms.description,(p._2+w(2)),"en")
         i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+p._1+"_"+w(3)))
       })
-      relNameMap.put(w(0).toLong,w(1))
-      val i = I(sns+"relationship_"+w(0),Map("en"->w(1)),OWL.ObjectProperty)
+      relNameMap.put(w(0).toLong,w(1).toLowerCase)
+      val i = I(sns+"relationship_"+w(0),Map("en"->w(1).toLowerCase),OWL.ObjectProperty)
       ANE(i,DCTerms.description,w(2),"en")
       i.addProperty(OWL.inverseOf,m.createResource(sns+"relationship_"+w(3)))
     }
