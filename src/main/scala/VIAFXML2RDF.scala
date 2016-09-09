@@ -208,7 +208,7 @@ object VIAFXML2RDF extends Anything2RDF {
             val (byear, bmonth, bdate) = partitionDate(birthDate)
             val (eyear, emonth, edate) = if (deathDate!="0") partitionDate(deathDate) else (byear, bmonth, bdate)
             val name = if (deathDate!="0" && deathDate!=birthDate) birthDate+"-"+deathDate else birthDate
-            s.triple(new Triple(r,flourishedP.asNode,makeTimeSpan(name, makeDateTime(byear,bmonth,bdate),makeDateTime(eyear,emonth,edate))).asNode)
+            s.triple(new Triple(r,flourishedP.asNode,makeTimeSpan(name, makeDateTime(byear,bmonth,bdate),makeDateTime(eyear,emonth,edate)).asNode))
           }
         case "lived" => 
           processDate(r, birthDateP, birthDate, false)
