@@ -39,6 +39,7 @@ import org.apache.jena.riot.system.StreamRDFWriter
 import com.hp.hpl.jena.graph.Triple
 import com.hp.hpl.jena.graph.NodeFactory
 import com.hp.hpl.jena.graph.Node
+import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 
 object VIAFXML2RDF extends Anything2RDF {
 
@@ -180,32 +181,32 @@ object VIAFXML2RDF extends Anything2RDF {
       val r = RN(ns+id)
       s.triple(new Triple(r,RDF.`type`.asNode,t.asNode))
       for (prefLabel <- prefLabels) s.triple(new Triple(r,SKOS.prefLabel.asNode, LN(prefLabel)))
-      for (altLabel <- altLabels) s.triple(new Triple(r,SKOS.altLabel.asNode, LN(altLabel)))
-      for (relLabel <- relLabels) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
+      for (altLabel <- altLabels; if !prefLabels.contains(altLabel)) s.triple(new Triple(r,SKOS.altLabel.asNode, LN(altLabel)))
+      for (relLabel <- relLabels if !prefLabels.contains(relLabel) && !altLabels.contains(relLabel)) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
       genderMap.get(gender).foreach(g => s.triple(new Triple(r,FOAF.gender.asNode, g.asNode)))
       for ((nationality,frequency) <- nationalities; if nationality!="XX") {
         val n = I(ns+"nationality_"+encode(nationality),nationality,Nationality)
         s.triple(new Triple(r,nationalityP.asNode, n.asNode))
-        if (frequency!=1) {
+/*        if (frequency!="1") {
           val st = BN()
           s.triple(new Triple(st,RDF.`type`.asNode, RDF.Statement.asNode))
           s.triple(new Triple(st,RDF.subject.asNode, r))
           s.triple(new Triple(st,RDF.predicate.asNode, nationalityP.asNode))
           s.triple(new Triple(st,RDF.`object`.asNode, n.asNode))
-          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency)))
-        }
+          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency,XSDDatatype.XSDinteger)))
+        }*/
       }
       for ((relatorCode,frequency) <- relatorCodes) {
         val n = I(ns+"role_"+encode(relatorCode),relatorCode,Role)
         s.triple(new Triple(r,relatorP.asNode, n.asNode))
-        if (frequency!=1) {
+/*        if (frequency!="1") {
           val st = BN()
           s.triple(new Triple(st,RDF.`type`.asNode, RDF.Statement.asNode))
           s.triple(new Triple(st,RDF.subject.asNode, r))
           s.triple(new Triple(st,RDF.predicate.asNode, relatorP.asNode))
           s.triple(new Triple(st,RDF.`object`.asNode, n.asNode))
-          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency)))
-        }
+          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency,XSDDatatype.XSDinteger)))
+        }*/
       }
   /*
   106024 "circa"
