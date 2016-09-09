@@ -3,20 +3,20 @@ import java.net.URLEncoder
 import org.apache.jena.riot.RDFFormat
 import org.apache.jena.riot.RDFDataMgr
 import java.io.FileOutputStream
-import com.hp.hpl.jena.rdf.model.ResourceFactory
-import com.hp.hpl.jena.rdf.model.Resource
-import com.hp.hpl.jena.rdf.model.ModelFactory
-import com.hp.hpl.jena.rdf.model.Model
-import com.hp.hpl.jena.vocabulary.RDF
-import com.hp.hpl.jena.vocabulary.OWL
-import com.hp.hpl.jena.vocabulary.DC
-import com.hp.hpl.jena.vocabulary.DC_11
-import com.hp.hpl.jena.vocabulary.RDFS
-import com.hp.hpl.jena.sparql.vocabulary.FOAF
+import org.apache.jena.rdf.model.ResourceFactory
+import org.apache.jena.rdf.model.Resource
+import org.apache.jena.rdf.model.ModelFactory
+import org.apache.jena.rdf.model.Model
+import org.apache.jena.vocabulary.RDF
+import org.apache.jena.vocabulary.OWL
+import org.apache.jena.vocabulary.DC
+import org.apache.jena.vocabulary.DC_11
+import org.apache.jena.vocabulary.RDFS
+import org.apache.jena.sparql.vocabulary.FOAF
 import com.github.nscala_time.time.Imports._
 import org.joda.time.format.ISODateTimeFormat
-import com.hp.hpl.jena.shared.PrefixMapping
-import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
+import org.apache.jena.shared.PrefixMapping
+import org.apache.jena.datatypes.xsd.XSDDatatype
 import com.bizo.mighty.csv.CSVDictReader
 
 object WIKIPEDIAWW1EVENTSCSV2RDF extends Anything2RDF {

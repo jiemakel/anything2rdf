@@ -5,26 +5,13 @@ import scala.xml.pull._
 import org.apache.jena.riot.RDFFormat
 import org.apache.jena.riot.RDFDataMgr
 import java.io.FileOutputStream
-import com.hp.hpl.jena.rdf.model.ResourceFactory
-import com.hp.hpl.jena.rdf.model.Resource
-import com.hp.hpl.jena.rdf.model.ModelFactory
-import com.hp.hpl.jena.rdf.model.Model
-import com.hp.hpl.jena.vocabulary.RDF
-import com.hp.hpl.jena.vocabulary.OWL
-import com.hp.hpl.jena.vocabulary.DC
-import com.hp.hpl.jena.vocabulary.DC_11
-import com.hp.hpl.jena.vocabulary.RDFS
 import com.bizo.mighty.csv.CSVDictReader
 import scala.xml.parsing.XhtmlEntities
-import com.hp.hpl.jena.vocabulary.DCTerms
 import java.io.FileInputStream
-import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import scala.collection.mutable.HashMap
 import scala.collection.JavaConversions._
 import scala.collection.mutable.HashSet
-import com.hp.hpl.jena.rdf.model.Statement
 import scala.collection.mutable.ArrayBuffer
-import com.hp.hpl.jena.sparql.vocabulary.FOAF
 import java.util.zip.GZIPInputStream
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.ArrayBlockingQueue
@@ -34,7 +21,14 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.Await
 import scala.concurrent.Future
 import java.util.zip.GZIPOutputStream
-import com.hp.hpl.jena.rdf.model.Property
+import org.apache.jena.riot.system.StreamRDFWriter
+import org.apache.jena.rdf.model.Resource
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.vocabulary.RDF
+import org.apache.jena.sparql.vocabulary.FOAF
+import org.apache.jena.graph.Triple
+import org.apache.jena.graph.NodeFactory
+import org.apache.jena.graph.Node
 
 object VIAFXML2RDF extends Anything2RDF {
 
@@ -49,6 +43,8 @@ object VIAFXML2RDF extends Anything2RDF {
   val relatorP = EOP("role")
   val Role = EC("Role")
   val frequencyP = EDP("frequency")
+  
+  val s = StreamRDFWriter.getWriterStream(new GZIPOutputStream(new FileOutputStream("viaf.nt")),RDFFormat.NTRIPLES) 
 
   /*4939498 "Corporate"  
  515435 "Geographic"  
@@ -126,12 +122,12 @@ object VIAFXML2RDF extends Anything2RDF {
      (parts(0), if (parts.length>1) parts(1) else "", if (parts.length>2) parts(2) else "")
   }
 
-  def processDate(r: Resource, dateP: Property, dateS: String, circa: Boolean): Unit = {
+  def processDate(r: Node, dateP: Property, dateS: String, circa: Boolean): Unit = {
     if (dateS!="0") {
       val (year, month, date) = partitionDate(dateS)
       val (bob,_) = makeDateTime(if (circa) "" + (year.toInt - 5) else year, month, date)
       val (_,eoe) = makeDateTime(if (circa) "" + (year.toInt + 5) else year, month, date)
-        r.addProperty(dateP, makeTimeSpan(date, bob, eoe))
+        s.triple(new Triple(r,dateP.asNode, makeTimeSpan(date, bob, eoe).asNode))
     }
   }
   
@@ -171,34 +167,34 @@ object VIAFXML2RDF extends Anything2RDF {
       case _ => 
     }
     nameTypeMap.get(nameType).foreach(t => m.synchronized {
-      val r = R(ns+id)
-      r.addProperty(RDF.`type`, t)
-      for (prefLabel <- prefLabels) r.addProperty(SKOS.prefLabel, prefLabel)
-      for (altLabel <- altLabels) r.addProperty(SKOS.altLabel, altLabel)
-      for (relLabel <- relLabels) r.addProperty(relatedLabel, relLabel)
-      genderMap.get(gender).foreach(g => r.addProperty(FOAF.gender, g))
+      val r = RN(ns+id)
+      s.triple(new Triple(r,RDF.`type`.asNode,t.asNode))
+      for (prefLabel <- prefLabels) s.triple(new Triple(r,SKOS.prefLabel.asNode, LN(prefLabel)))
+      for (altLabel <- altLabels) s.triple(new Triple(r,SKOS.altLabel.asNode, LN(altLabel)))
+      for (relLabel <- relLabels) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
+      genderMap.get(gender).foreach(g => s.triple(new Triple(r,FOAF.gender.asNode, g.asNode)))
       for ((nationality,frequency) <- nationalities; if nationality!="XX") {
         val n = I(ns+"nationality_"+encode(nationality),nationality,Nationality)
-        r.addProperty(nationalityP, n)
+        s.triple(new Triple(r,nationalityP.asNode, n.asNode))
         if (frequency!=1) {
-          val s = m.createResource()
-          s.addProperty(RDF.`type`, RDF.Statement)
-          s.addProperty(RDF.subject, r)
-          s.addProperty(RDF.predicate, nationalityP)
-          s.addProperty(RDF.`object`, n)
-          s.addProperty(frequencyP, frequency)
+          val st = BN()
+          s.triple(new Triple(st,RDF.`type`.asNode, RDF.Statement.asNode))
+          s.triple(new Triple(st,RDF.subject.asNode, r))
+          s.triple(new Triple(st,RDF.predicate.asNode, nationalityP.asNode))
+          s.triple(new Triple(st,RDF.`object`.asNode, n.asNode))
+          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency)))
         }
       }
       for ((relatorCode,frequency) <- relatorCodes) {
         val n = I(ns+"role_"+encode(relatorCode),relatorCode,Role)
-        r.addProperty(nationalityP, n)
+        s.triple(new Triple(r,relatorP.asNode, n.asNode))
         if (frequency!=1) {
-          val s = m.createResource()
-          s.addProperty(RDF.`type`, RDF.Statement)
-          s.addProperty(RDF.subject, r)
-          s.addProperty(RDF.predicate, nationalityP)
-          s.addProperty(RDF.`object`, n)
-          s.addProperty(frequencyP, frequency)
+          val st = BN()
+          s.triple(new Triple(st,RDF.`type`.asNode, RDF.Statement.asNode))
+          s.triple(new Triple(st,RDF.subject.asNode, r))
+          s.triple(new Triple(st,RDF.predicate.asNode, relatorP.asNode))
+          s.triple(new Triple(st,RDF.`object`.asNode, n.asNode))
+          s.triple(new Triple(st,frequencyP.asNode, NodeFactory.createLiteral(frequency)))
         }
       }
   /*
@@ -212,7 +208,7 @@ object VIAFXML2RDF extends Anything2RDF {
             val (byear, bmonth, bdate) = partitionDate(birthDate)
             val (eyear, emonth, edate) = if (deathDate!="0") partitionDate(deathDate) else (byear, bmonth, bdate)
             val name = if (deathDate!="0" && deathDate!=birthDate) birthDate+"-"+deathDate else birthDate
-            r.addProperty(flourishedP, makeTimeSpan(name, makeDateTime(byear,bmonth,bdate),makeDateTime(eyear,emonth,edate)))
+            s.triple(new Triple(r,flourishedP.asNode,makeTimeSpan(name, makeDateTime(byear,bmonth,bdate),makeDateTime(eyear,emonth,edate))).asNode)
           }
         case "lived" => 
           processDate(r, birthDateP, birthDate, false)
@@ -242,11 +238,13 @@ object VIAFXML2RDF extends Anything2RDF {
   )
 
   def main(args: Array[String]): Unit = {
-    val s = Source.fromInputStream(new GZIPInputStream(new FileInputStream("viaf.xml.gz")), "UTF-8")
-    val f = Future.sequence(for (record <- s.getLines) yield process(record))
+    val st = Source.fromInputStream(new GZIPInputStream(new FileInputStream("viaf.xml.gz")), "UTF-8")
+    s.start()
+    val f = Future.sequence(for (record <- st.getLines) yield process(record))
     f.onFailure { case t => logger.error("Processing of at least one linr resulted in an error:" + t.getMessage+": " + t.printStackTrace) }
     f.onSuccess { case _ => logger.info("Successfully processed all lines.") }
     Await.result(f, Duration.Inf)
-    RDFDataMgr.write(new GZIPOutputStream(new FileOutputStream("viaf.nt.gz")), m, RDFFormat.NT)
+    s.finish()
+    RDFDataMgr.write(new FileOutputStream("viaf-ontology.ttl"), m, RDFFormat.TTL)
   }
 }

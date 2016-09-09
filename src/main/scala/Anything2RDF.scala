@@ -3,19 +3,15 @@ import java.net.URLEncoder
 import org.apache.jena.riot.RDFFormat
 import org.apache.jena.riot.RDFDataMgr
 import java.io.FileOutputStream
-import com.hp.hpl.jena.rdf.model.ResourceFactory
-import com.hp.hpl.jena.rdf.model.Resource
-import com.hp.hpl.jena.rdf.model.ModelFactory
-import com.hp.hpl.jena.rdf.model.Model
-import com.hp.hpl.jena.vocabulary.RDF
-import com.hp.hpl.jena.vocabulary.OWL
-import com.hp.hpl.jena.vocabulary.DC
-import com.hp.hpl.jena.vocabulary.DC_11
-import com.hp.hpl.jena.vocabulary.RDFS
-import com.hp.hpl.jena.rdf.model.Property
 import org.joda.time.format.ISODateTimeFormat
-import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.typesafe.scalalogging.LazyLogging
+import org.apache.jena.rdf.model.ModelFactory
+import org.apache.jena.rdf.model.Resource
+import org.apache.jena.datatypes.xsd.XSDDatatype
+import org.apache.jena.rdf.model.Property
+import org.apache.jena.vocabulary.OWL
+import org.apache.jena.vocabulary.RDF
+import org.apache.jena.graph.NodeFactory
 
 abstract class Anything2RDF extends LazyLogging {
   
@@ -115,6 +111,14 @@ abstract class Anything2RDF extends LazyLogging {
   def EDP(s: String) = P(sns+propertyCamelCase(s),Map("en"->s),OWL.DatatypeProperty)
   
   def R(s: String) = m.createResource(s)
+  
+  def RN(s: String) = NodeFactory.createURI(s)
+  
+  def LN(s: String) = NodeFactory.createLiteral(s)
+  
+  def LN(s: String, lang: String) = NodeFactory.createLiteral(s, lang)
+  
+  def BN() = NodeFactory.createAnon()
   
   def EC(s: String) = I(sns+camelCase(s),Map("en"->s),OWL.Class)
   

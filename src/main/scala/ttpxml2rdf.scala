@@ -5,18 +5,18 @@ import scala.xml.pull._
 import org.apache.jena.riot.RDFFormat
 import org.apache.jena.riot.RDFDataMgr
 import java.io.FileOutputStream
-import com.hp.hpl.jena.rdf.model.ResourceFactory
-import com.hp.hpl.jena.rdf.model.Resource
-import com.hp.hpl.jena.rdf.model.ModelFactory
-import com.hp.hpl.jena.rdf.model.Model
-import com.hp.hpl.jena.vocabulary.RDF
-import com.hp.hpl.jena.vocabulary.OWL
-import com.hp.hpl.jena.vocabulary.DC
-import com.hp.hpl.jena.vocabulary.DC_11
-import com.hp.hpl.jena.vocabulary.RDFS
+import org.apache.jena.rdf.model.ResourceFactory
+import org.apache.jena.rdf.model.Resource
+import org.apache.jena.rdf.model.ModelFactory
+import org.apache.jena.rdf.model.Model
+import org.apache.jena.vocabulary.RDF
+import org.apache.jena.vocabulary.OWL
+import org.apache.jena.vocabulary.DC
+import org.apache.jena.vocabulary.DC_11
+import org.apache.jena.vocabulary.RDFS
 import com.bizo.mighty.csv.CSVDictReader
 import scala.xml.parsing.XhtmlEntities
-import com.hp.hpl.jena.vocabulary.DCTerms
+import org.apache.jena.vocabulary.DCTerms
 
 object TTPXML2RDF extends Anything2RDF {
 

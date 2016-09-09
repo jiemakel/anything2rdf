@@ -1,4 +1,4 @@
-import com.hp.hpl.jena.rdf.model.ResourceFactory
+import org.apache.jena.rdf.model.ResourceFactory
 
 /**
  * @author jiemakel
