@@ -11,4 +11,6 @@ object SDMXCode {
   def P(s: String) = ResourceFactory.createProperty(ns+s)
   val sexMale = R("sex-M")
   val sexFemale = R("sex-F")
+  val sexUnknown = R("sex-U")
+  val sexNotApplicable = R("sex-N")
 }
