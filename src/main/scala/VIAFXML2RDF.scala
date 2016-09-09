@@ -45,7 +45,7 @@ object VIAFXML2RDF extends Anything2RDF {
   val Role = EC("Role")
   val frequencyP = EDP("frequency")
   
-  val s = StreamRDFWriter.getWriterStream(new GZIPOutputStream(new FileOutputStream("viaf.nt")),RDFFormat.NTRIPLES) 
+  val s = StreamRDFWriter.getWriterStream(new GZIPOutputStream(new FileOutputStream("viaf.nt.gz")),RDFFormat.NTRIPLES) 
 
   /*4939498 "Corporate"  
  515435 "Geographic"  
