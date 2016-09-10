@@ -138,7 +138,7 @@ object VIAFXML2RDF extends Anything2RDF {
       val (year, month, date) = partitionDate(dateS)
       val (bob,_) = makeDateTime(if (circa) "" + (year.toInt - 5) else year, month, date)
       val (_,eoe) = makeDateTime(if (circa) "" + (year.toInt + 5) else year, month, date)
-        s.triple(new Triple(r,dateP.asNode, makeTimeSpan(date, bob, eoe).asNode))
+        s.triple(new Triple(r,dateP.asNode, makeTimeSpan(dateS, bob, eoe).asNode))
     }
   }
 
@@ -148,7 +148,7 @@ object VIAFXML2RDF extends Anything2RDF {
     var nameType: String = ""
     val prefLabels: HashSet[String] = new HashSet[String]()
     val altLabels: HashSet[String] = new HashSet[String]()
-    val relLabels: HashSet[String] = new HashSet[String]()
+    //val relLabels: HashSet[String] = new HashSet[String]()
     var birthDate: String = ""
     var deathDate: String = ""
     var dateType: String = ""
@@ -171,7 +171,7 @@ object VIAFXML2RDF extends Anything2RDF {
       case EvElemStart(_,"birthDate",_,_) => birthDate = readContents
       case EvElemStart(_,"deathDate",_,_) => deathDate = readContents
       case EvElemStart(_,"x400",_,_) => readAlternate("x400").foreach(altLabels.add(_))
-      case EvElemStart(_,"x500",_,_) => readAlternate("x500").foreach(relLabels.add(_))
+      //case EvElemStart(_,"x500",_,_) => readAlternate("x500").foreach(relLabels.add(_))
       case EvElemStart(_,"nationalityOfEntity",_,_) => readAggregate("nationalityOfEntity", nationalities)
       //case EvElemStart(_,"countries",_,_) => readAggregate("countries", countries)
       case EvElemStart(_,"RelatorCodes",_,_) => readAggregate("RelatorCodes", relatorCodes)
@@ -182,7 +182,7 @@ object VIAFXML2RDF extends Anything2RDF {
       s.triple(new Triple(r,RDF.`type`.asNode,t.asNode))
       for (prefLabel <- prefLabels) s.triple(new Triple(r,SKOS.prefLabel.asNode, LN(prefLabel)))
       for (altLabel <- altLabels; if !prefLabels.contains(altLabel)) s.triple(new Triple(r,SKOS.altLabel.asNode, LN(altLabel)))
-      for (relLabel <- relLabels if !prefLabels.contains(relLabel) && !altLabels.contains(relLabel)) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
+      //for (relLabel <- relLabels if !prefLabels.contains(relLabel) && !altLabels.contains(relLabel)) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
       genderMap.get(gender).foreach(g => s.triple(new Triple(r,FOAF.gender.asNode, g.asNode)))
       for ((nationality,frequency) <- nationalities; if nationality!="XX") {
         val n = I(ns+"nationality_"+encode(nationality),nationality,Nationality)
@@ -256,6 +256,10 @@ object VIAFXML2RDF extends Anything2RDF {
     f.onSuccess { case _ => logger.info("Successfully processed all lines.") }
     Await.result(f, Duration.Inf)
     s.finish()
+    m.setNsPrefix("crm", CIDOC.ns)
+    m.setNsPrefix("viaf", ns)
+    m.setNsPrefix("viaf-schema", sns)
+    m.setNsPrefix("SKOS", SKOS.ns)
     RDFDataMgr.write(new FileOutputStream("viaf-ontology.ttl"), m, RDFFormat.TTL)
   }
 }
