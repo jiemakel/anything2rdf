@@ -40,6 +40,7 @@ import com.hp.hpl.jena.graph.Triple
 import com.hp.hpl.jena.graph.NodeFactory
 import com.hp.hpl.jena.graph.Node
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
+import com.hp.hpl.jena.vocabulary.XSD
 
 object VIAFXML2RDF extends Anything2RDF {
 
@@ -259,7 +260,8 @@ object VIAFXML2RDF extends Anything2RDF {
     m.setNsPrefix("crm", CIDOC.ns)
     m.setNsPrefix("viaf", ns)
     m.setNsPrefix("viaf-schema", sns)
-    m.setNsPrefix("SKOS", SKOS.ns)
+    m.setNsPrefix("skos", SKOS.ns)
+    m.setNsPrefix("xsd", XSD.NS)
     RDFDataMgr.write(new FileOutputStream("viaf-ontology.ttl"), m, RDFFormat.TTL)
   }
 }
