@@ -73,7 +73,7 @@ abstract class Anything2RDF extends LazyLogging {
       else if (date.length()==1) "0"+date
       else date
     }
-    (s"${ayear}-${bmonth}-${bdate}T00:00:00.000",s"${ayear}-${emonth}-${edate}T23:59:59.999")
+    (s"${ayear}-${bmonth}-${bdate}T00:00:00",s"${ayear}-${emonth}-${edate}T23:59:59")
   }
   
   def camelCase(text: String) : String = separators.replaceAllIn(words.replaceAllIn(text, m => m.matched.toLowerCase.capitalize), "");
