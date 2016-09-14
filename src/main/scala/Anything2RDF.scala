@@ -52,7 +52,7 @@ abstract class Anything2RDF extends LazyLogging {
   }
 
   def makeDateTime(year:String,month:String,date:String): (String, String) = {
-    val ayear = "0"*(4-year.length)+year
+    val ayear = if (year.startsWith("-")) "-" + "0"*(5-year.length)+year.substring(1); else "0"*(4-year.length)+year
     val bmonth = {
       if (month.isEmpty() || month == "99" || month.matches("^0{1,2}$")) "01"
       else if (month.length()==1) "0"+month
