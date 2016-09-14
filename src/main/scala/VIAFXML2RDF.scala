@@ -41,6 +41,7 @@ import com.hp.hpl.jena.graph.NodeFactory
 import com.hp.hpl.jena.graph.Node
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.hp.hpl.jena.vocabulary.XSD
+import com.hp.hpl.jena.vocabulary.DCTerms
 
 object VIAFXML2RDF extends Anything2RDF {
 
@@ -56,7 +57,8 @@ object VIAFXML2RDF extends Anything2RDF {
   val Role = EC("Role")
   val frequencyP = EDP("frequency")
 
-  val s = StreamRDFWriter.getWriterStream(new GZIPOutputStream(new FileOutputStream("viaf.nt.gz")),RDFFormat.NTRIPLES)
+  val os = new GZIPOutputStream(new FileOutputStream("viaf.nt.gz"))
+  val s = StreamRDFWriter.getWriterStream(os,RDFFormat.NTRIPLES)
 
   /*4939498 "Corporate"
  515435 "Geographic"
@@ -154,6 +156,7 @@ object VIAFXML2RDF extends Anything2RDF {
     var deathDate: String = ""
     var dateType: String = ""
     var gender: String = ""
+    val identifiers: HashSet[String] = new HashSet[String]()
     val nationalities: HashMap[String,String] = new HashMap[String,String]()
     //val countries: HashMap[String,String] = new HashMap[String,String]()
     val relatorCodes: HashMap[String,String] = new HashMap[String,String]()
@@ -167,6 +170,7 @@ object VIAFXML2RDF extends Anything2RDF {
           case EvElemEnd(_,"mainHeadings") => break = true
           case _ =>
         }
+      case EvElemStart(_,"source",_,_) => identifiers.add(readContents)
       case EvElemStart(_,"dateType",_,_) => dateType = readContents
       case EvElemStart(_,"gender",_,_) => gender = readContents
       case EvElemStart(_,"birthDate",_,_) => birthDate = readContents
@@ -181,6 +185,7 @@ object VIAFXML2RDF extends Anything2RDF {
     nameTypeMap.get(nameType).foreach(t => m.synchronized {
       val r = RN(ns+id)
       s.triple(new Triple(r,RDF.`type`.asNode,t.asNode))
+      for (identifier <- identifiers) s.triple(new Triple(r,DCTerms.identifier.asNode, LN(identifier)))
       for (prefLabel <- prefLabels) s.triple(new Triple(r,SKOS.prefLabel.asNode, LN(prefLabel)))
       for (altLabel <- altLabels; if !prefLabels.contains(altLabel)) s.triple(new Triple(r,SKOS.altLabel.asNode, LN(altLabel)))
       //for (relLabel <- relLabels if !prefLabels.contains(relLabel) && !altLabels.contains(relLabel)) s.triple(new Triple(r,relatedLabel.asNode, LN(relLabel)))
@@ -257,11 +262,14 @@ object VIAFXML2RDF extends Anything2RDF {
     f.onSuccess { case _ => logger.info("Successfully processed all lines.") }
     Await.result(f, Duration.Inf)
     s.finish()
+    st.close()
+    os.close()
     m.setNsPrefix("crm", CIDOC.ns)
     m.setNsPrefix("viaf", ns)
     m.setNsPrefix("viaf-schema", sns)
     m.setNsPrefix("skos", SKOS.ns)
     m.setNsPrefix("xsd", XSD.getURI())
     RDFDataMgr.write(new FileOutputStream("viaf-ontology.ttl"), m, RDFFormat.TTL)
+    System.exit(0)
   }
 }
