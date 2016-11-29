@@ -264,7 +264,7 @@ object EMLOCSV2RDF extends Anything2RDF {
         val tmp = m.createResource(getUUIDURI(manifestationWorkMap(w(h("manifestation_id")))))
         manifestationMap.put(w(h("manifestation_id")),tmp)
         tmp
-      } else I(ns+w(h("manifestation_id")),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
+      } else I(getUUIDURI(w(h("manifestation_id"))),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
       if (!w(h("id_number_or_shelfmark")).trim.isEmpty) ma.addProperty(id_number_or_shelfmark,w(h("id_number_or_shelfmark")))
       if (!w(h("printed_edition_details")).trim.isEmpty) ma.addProperty(printed_edition_details,w(h("printed_edition_details")))
       if (!w(h("paper_size")).trim.isEmpty) ma.addProperty(paper_size,w(h("paper_size")))
