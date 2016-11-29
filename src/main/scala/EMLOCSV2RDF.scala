@@ -308,7 +308,7 @@ object EMLOCSV2RDF extends Anything2RDF {
           case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(getUUIDURI(w(liv))),m.createProperty(sns+w(ind)),m.createResource(getUUIDURI(w(riv))))
           case _ =>
             val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(getUUIDURI(w(liv))))))
-            val riri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(getUUIDURI(w(riv))))))
+            val riri = manifestationMap.getOrElse(w(riv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(getUUIDURI(w(riv))))))
             m.add(liri,m.createProperty(sns+w(ind)),riri)
         }
 
