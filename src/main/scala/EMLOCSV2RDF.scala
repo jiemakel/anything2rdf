@@ -79,6 +79,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 
   val iperson_id = EDP("iperson_id")
   val place_id = EDP("place_id")
+  val iwork_id = EDP("iwork_id")
 
   val id_number_or_shelfmark = EDP("id number or shelfmark")
   val printed_edition_details = EDP("printed edition details")
@@ -108,7 +109,7 @@ object EMLOCSV2RDF extends Anything2RDF {
   def getUUIDURI(id : String)(implicit uuidMap: HashMap[String,String]) : String = {
     ns+uuidMap.getOrElse(id,id)
   }
-  
+
   def iriFix(iri: String): String = {
     val ret = new StringBuilder()
     for (char <- iri) char match {
@@ -157,7 +158,7 @@ object EMLOCSV2RDF extends Anything2RDF {
           var violationMessage=""
           while (violations.hasNext) violationMessage+=violations.next.getShortMessage+", "
           logger.warn("Bad URL: "+w(h("resource_url"))+"("+violationMessage+")")
-          ns+w(h("resource_id")) 
+          ns+w(h("resource_id"))
         } else iri2
       } else ns+w(h("resource_id"))
       val res = I(iri,w(h("resource_name")),CIDOC.Information_Object)
@@ -184,6 +185,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     breakable { for (w <- wr) {
       workNameMap.put(w(h("work_id")),w(h("description")))
       val wo = I(getUUIDURI(w(h("work_id"))),Map("en"->w(h("description"))),Letter)
+      if (!w(h("iwork_id")).trim.isEmpty) wo.addProperty(iwork_id,w(h("iwork_id")))
       if (!w(h("original_calendar")).trim.isEmpty) wo.addProperty(original_calendar,I(ns+"calendar_"+encode(w(h("original_calendar"))),Map("en"->w(h("original_calendar"))),Calendar))
       if (!w(h("original_catalogue")).trim.isEmpty) wo.addProperty(source,I(ns+"source_"+encode(w(h("original_catalogue"))),w(h("original_catalogue")),Source))
       if (!w(h("abstract")).trim.isEmpty) wo.addProperty(DCTerms.description,w(h("abstract")).trim,"en")
