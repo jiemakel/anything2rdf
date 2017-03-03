@@ -121,7 +121,7 @@ abstract class Anything2RDF extends LazyLogging {
 
   def LN(s: String) = NodeFactory.createLiteral(s)
 
-  def LN(s: String, lang: String) = NodeFactory.createLiteral(s, lang)
+  def LN(s: String, lang: String) = NodeFactory.createLiteral(s, lang, null)
 
   def BN() = NodeFactory.createAnon()
 

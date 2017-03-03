@@ -35,7 +35,8 @@ import scala.concurrent.Await
 import scala.concurrent.Future
 import java.util.zip.GZIPOutputStream
 import com.hp.hpl.jena.rdf.model.Property
-import org.apache.jena.riot.system.StreamRDFWriter
+import org.apache.jena.riot.writer.WriterStreamRDFBlocks
+
 import com.hp.hpl.jena.graph.Triple
 import com.hp.hpl.jena.graph.NodeFactory
 import com.hp.hpl.jena.graph.Node
@@ -58,7 +59,7 @@ object VIAFXML2RDF extends Anything2RDF {
   val frequencyP = EDP("frequency")
 
   val os = new GZIPOutputStream(new FileOutputStream("viaf.nt.gz"))
-  val s = StreamRDFWriter.getWriterStream(os,RDFFormat.NTRIPLES)
+  val s = new WriterStreamRDFBlocks(os)
 
   /*4939498 "Corporate"
  515435 "Geographic"
