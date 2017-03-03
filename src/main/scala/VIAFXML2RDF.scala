@@ -261,7 +261,7 @@ object VIAFXML2RDF extends Anything2RDF {
     m.setNsPrefix("viaf", ns)
     m.setNsPrefix("viaf-schema", sns)
     m.setNsPrefix("skos", SKOS.ns)
-    m.setNsPrefix("xsd", XSD.NS)
+    m.setNsPrefix("xsd", XSD.getURI())
     RDFDataMgr.write(new FileOutputStream("viaf-ontology.ttl"), m, RDFFormat.TTL)
   }
 }
