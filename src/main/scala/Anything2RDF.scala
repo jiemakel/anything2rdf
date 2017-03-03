@@ -16,9 +16,10 @@ import com.hp.hpl.jena.rdf.model.Property
 import org.joda.time.format.ISODateTimeFormat
 import com.hp.hpl.jena.datatypes.xsd.XSDDatatype
 import com.typesafe.scalalogging.LazyLogging
+import com.hp.hpl.jena.graph.NodeFactory
 
 abstract class Anything2RDF extends LazyLogging {
-  
+
   implicit val m = ModelFactory.createDefaultModel()
 
   val sns : String
@@ -41,7 +42,7 @@ abstract class Anything2RDF extends LazyLogging {
      eoe.foreach(ts.addProperty(CIDOC.end_of_the_end,_,XSDDatatype.XSDdateTime))
      ts
   }
-  
+
   def makeDateString(year:String,month:String,date:String): String = {
     var ret = year
     if (!month.isEmpty) {
@@ -79,7 +80,7 @@ abstract class Anything2RDF extends LazyLogging {
     }
     (s"${ayear}-${bmonth}-${bdate}T00:00:00.000",s"${ayear}-${emonth}-${edate}T23:59:59.999")
   }
-  
+
   def camelCase(text: String) : String = separators.replaceAllIn(words.replaceAllIn(text, m => m.matched.toLowerCase.capitalize), "");
 
   def uncapitalize(toString : String): String =
@@ -90,11 +91,11 @@ abstract class Anything2RDF extends LazyLogging {
       chars(0) = chars(0).toLower
       new String(chars)
     }
-  
+
   def propertyCamelCase(text: String) : String = separators.replaceAllIn(uncapitalize(words.replaceAllIn(text, m => m.matched.toLowerCase.capitalize)), "");
 
   def P(s: String) = m.createProperty(s)
-  
+
   def P(uri: String, labels : Map[String,String], c : Resource): Property = {
     val r = m.createProperty(uri)
     labels.foreach{ case (lang: String, label : String) => r.addProperty(SKOS.prefLabel,label,lang) }
@@ -111,14 +112,22 @@ abstract class Anything2RDF extends LazyLogging {
   }
 
   def EOP(s: String) = P(sns+propertyCamelCase(s),Map("en"->s),OWL.ObjectProperty)
-  
+
   def EDP(s: String) = P(sns+propertyCamelCase(s),Map("en"->s),OWL.DatatypeProperty)
-  
+
   def R(s: String) = m.createResource(s)
-  
+
+  def RN(s: String) = NodeFactory.createURI(s)
+
+  def LN(s: String) = NodeFactory.createLiteral(s)
+
+  def LN(s: String, lang: String) = NodeFactory.createLiteral(s, lang)
+
+  def BN() = NodeFactory.createAnon()
+
   def EC(s: String) = I(sns+camelCase(s),Map("en"->s),OWL.Class)
-  
-  
+
+
   def I(uri: String, labels : Map[String,String], c : Resource): Resource = {
     val r = m.createResource(uri)
     labels.foreach{ case (lang: String, label : String) => r.addProperty(SKOS.prefLabel,label,lang) }
@@ -138,7 +147,7 @@ abstract class Anything2RDF extends LazyLogging {
     r.addProperty(RDF.`type`,c)
     r
   }
-  
+
   def encode(s : String): String = URLEncoder.encode(s,"UTF-8")
-  
+
 }
