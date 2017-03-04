@@ -176,7 +176,7 @@ object EMLOCSV2RDF extends Anything2RDF {
         if (w(ind)=="cofk_union_relationship_type-is_manifestation_of") manifestationWorkMap.put(w(liv),w(riv))
     implicit val uuidMap = new HashMap[String,String]
     wr = CSVReader("uuidmap.csv")
-    for (w <- wr) uuidMap.put(w(0),w(1))
+    for (w <- wr) if (!w(0).trim.isEmpty && !w(1).trim.isEmpty) uuidMap.put(w(0),w(1))
     wr = CSVReader("cofk_union_work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
