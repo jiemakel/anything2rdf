@@ -106,7 +106,12 @@ object EMLOCSV2RDF extends Anything2RDF {
     unCCRegex.replaceAllIn(str, " ")
   }
 
-  def getUUIDURI(id : String)(implicit uuidMap: HashMap[String,String]) : String = {
+  val uuidMap = new HashMap[String,String]
+  def putUUID(id : String, uuid : String) = {
+    uuidMap.put(id,uuid)
+  }
+
+  def getUUIDURI(id : String) : String = {
     ns+uuidMap.getOrElse(id,id)
   }
 
@@ -174,9 +179,6 @@ object EMLOCSV2RDF extends Anything2RDF {
     val riv = h("right_id_value")
     for (w <- wr)
         if (w(ind)=="cofk_union_relationship_type-is_manifestation_of") manifestationWorkMap.put(w(liv),w(riv))
-    implicit val uuidMap = new HashMap[String,String]
-    wr = CSVReader("uuidmap.csv")
-    for (w <- wr) if (!w(0).trim.isEmpty && !w(1).trim.isEmpty) uuidMap.put(w(0),w(1))
     wr = CSVReader("cofk_union_work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
@@ -184,6 +186,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val workMetadataMap = new HashMap[String,Metadata]
     breakable { for (w <- wr) {
       workNameMap.put(w(h("work_id")),w(h("description")))
+      putUUID(w(h("work_id")),w(h("uuid")))
       val wo = I(getUUIDURI(w(h("work_id"))),Map("en"->w(h("description"))),Letter)
       if (!w(h("iwork_id")).trim.isEmpty) wo.addProperty(iwork_id,w(h("iwork_id")))
       if (!w(h("original_calendar")).trim.isEmpty) wo.addProperty(original_calendar,I(ns+"calendar_"+encode(w(h("original_calendar"))),Map("en"->w(h("original_calendar"))),Calendar))
@@ -264,7 +267,10 @@ object EMLOCSV2RDF extends Anything2RDF {
         val tmp = m.createResource(getUUIDURI(manifestationWorkMap(w(h("manifestation_id")))))
         manifestationMap.put(w(h("manifestation_id")),tmp)
         tmp
-      } else I(getUUIDURI(w(h("manifestation_id"))),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
+      } else {
+        putUUID(w(h("manifestation_id")),w(h("uuid")))
+        I(getUUIDURI(w(h("manifestation_id"))),w(h("manifestation_type"))+" of "+manifestationWorkMap.get(w(h("manifestation_id"))).flatMap(workNameMap.get(_)).getOrElse("?"),t)
+      }
       if (!w(h("id_number_or_shelfmark")).trim.isEmpty) ma.addProperty(id_number_or_shelfmark,w(h("id_number_or_shelfmark")))
       if (!w(h("printed_edition_details")).trim.isEmpty) ma.addProperty(printed_edition_details,w(h("printed_edition_details")))
       if (!w(h("paper_size")).trim.isEmpty) ma.addProperty(paper_size,w(h("paper_size")))
@@ -298,30 +304,13 @@ object EMLOCSV2RDF extends Anything2RDF {
 //manifestation_creation_date_month, manifestation_creation_date_day, manifestation_creation_date_inferred,
 //manifestation_creation_date_uncertain, manifestation_creation_date_approx, manifestation_is_translation, language_of_manifestation,
 //address, manifestation_incipit, manifestation_excipit, manifestation_ps)
-    wr = CSVReader("cofk_union_relationship.csv")
-    headers = wr.next
-    h = headers.zipWithIndex.toMap
-    breakable { for (w <- wr) {
-        w(ind) match {
-          case "cofk_union_relationship_type-created" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(getUUIDURI(w(riv))))
-          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(getUUIDURI(w(riv))))
-          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(getUUIDURI(w(riv))))
-          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(getUUIDURI(w(riv))))
-          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(getUUIDURI(w(liv))),m.createProperty(sns+w(ind)),m.createResource(getUUIDURI(w(riv))))
-          case _ =>
-            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(getUUIDURI(w(liv))))))
-            val riri = manifestationMap.getOrElse(w(riv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(getUUIDURI(w(riv))))))
-            m.add(liri,m.createProperty(sns+w(ind)),riri)
-        }
-
-    }}
-//relationship_id,left_table_name,left_id_value,relationship_type,right_table_name,right_id_value,relationship_valid_from,relationship_valid_till,creation_timestamp,creation_user,change_timestamp,change_user
     wr = CSVReader("cofk_union_location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val locationMap = new HashMap[String,Resource]()
     val locationFNMap = new HashMap[String,Resource]()
     breakable { for (w <- wr) {
+      putUUID(w(h("location_id")),w(h("uuid")))
       val l = m.createResource(getUUIDURI(w(h("location_id"))))
       l.addProperty(place_id,w(h("location_id")).substring(20))
       l.addProperty(RDF.`type`,CIDOC.Place)
@@ -350,6 +339,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
+      putUUID(w(h("institution_id")),w(h("uuid")))
       val i = I(getUUIDURI(w(h("institution_id"))),w(h("institution_name")),CIDOC.Legal_Body)
       w(h("institution_synonyms")).split('\n').map(_.trim).filter(!_.isEmpty).foreach(n => i.addProperty(SKOS.altLabel,n))
       val city = if (!w(h("institution_city")).trim.isEmpty) {
@@ -390,6 +380,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val personIdMap = new HashMap[String,Resource]
     val personNameMap = new HashMap[String,String]
     breakable { for (w <- wr) {
+      putUUID(w(h("person_id")),w(h("uuid")))
       val p = I(getUUIDURI(w(h("person_id"))),w(h("foaf_name")),if (!w(h("is_organisation")).trim.isEmpty) CIDOC.Group else CIDOC.Person)
       personIdMap.put(w(h("iperson_id")),p)
       personNameMap.put(w(h("iperson_id")),w(h("foaf_name")))
@@ -425,6 +416,24 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //csv2rdf List(person_id, foaf_name, skos_altlabel, skos_hiddenlabel, person_aliases, date_of_birth_year, date_of_birth_month, date_of_birth_day, date_of_birth, date_of_birth_inferred, date_of_birth_uncertain, date_of_birth_approx, date_of_death_year, date_of_death_month, date_of_death_day, date_of_death, date_of_death_inferred, date_of_death_uncertain, date_of_death_approx, gender, is_organisation, iperson_id, creation_timestamp, creation_user, change_timestamp, change_user, further_reading, sent_count, recd_count, mentioned_count)
+    wr = CSVReader("cofk_union_relationship.csv")
+    headers = wr.next
+    h = headers.zipWithIndex.toMap
+    breakable { for (w <- wr) {
+        w(ind) match {
+          case "cofk_union_relationship_type-created" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.author_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-created")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_sent_from" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.origin_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_from")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_sent_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.destination_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_sent_to")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-was_addressed_to" => m.add(m.createResource(getUUIDURI(w(liv))),workMetadataMap.get(w(liv)).map(_.addressee_property).getOrElse(m.createProperty(sns+"cofk_union_relationship_type-was_addressed_to")),m.createResource(getUUIDURI(w(riv))))
+          case "cofk_union_relationship_type-is_manifestation_of" => if (manifestationMap.get(w(liv)).isEmpty) m.add(m.createResource(getUUIDURI(w(liv))),m.createProperty(sns+w(ind)),m.createResource(getUUIDURI(w(riv))))
+          case _ =>
+            val liri = manifestationMap.getOrElse(w(liv),imageMap.getOrElse(w(liv), resourceMap.getOrElse(w(liv),m.createResource(getUUIDURI(w(liv))))))
+            val riri = manifestationMap.getOrElse(w(riv),imageMap.getOrElse(w(riv), resourceMap.getOrElse(w(riv),m.createResource(getUUIDURI(w(riv))))))
+            m.add(liri,m.createProperty(sns+w(ind)),riri)
+        }
+
+    }}
+//relationship_id,left_table_name,left_id_value,relationship_type,right_table_name,right_id_value,relationship_valid_from,relationship_valid_till,creation_timestamp,creation_user,change_timestamp,change_user
     wr = CSVReader("cofk_union_relationship_type.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
