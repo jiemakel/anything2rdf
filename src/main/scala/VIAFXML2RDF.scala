@@ -229,7 +229,7 @@ object VIAFXML2RDF extends Anything2RDF {
   }
   
   val numWorkers = sys.runtime.availableProcessors
-  val queueCapacity = 2
+  val queueCapacity = 1000
 
   implicit val ec = ExecutionContext.fromExecutorService(
    new ThreadPoolExecutor(
