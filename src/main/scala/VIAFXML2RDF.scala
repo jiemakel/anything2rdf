@@ -32,6 +32,7 @@ import org.apache.jena.graph.Node
 import org.apache.jena.datatypes.xsd.XSDDatatype
 import org.apache.jena.vocabulary.XSD
 import org.apache.jena.vocabulary.DCTerms
+import scala.concurrent.ExecutionContext.Implicits.global
 
 object VIAFXML2RDF extends Anything2RDF {
 
