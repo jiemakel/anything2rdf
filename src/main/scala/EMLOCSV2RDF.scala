@@ -139,12 +139,12 @@ object EMLOCSV2RDF extends Anything2RDF {
     var wr : CSVReader = null
     var headers: Array[String] = null
     var h: Map[String,Int] = null
-    wr = CSVReader("cofk_union_image.csv")
+    wr = CSVReader("image.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val imageMap = new HashMap[String,Resource]
     breakable { for (w <- wr) {
-      val i = m.createResource(w(h("image_filename")))
+      val i = m.createResource(iriFix(w(h("image_filename"))))
       i.addProperty(RDF.`type`,CIDOC.Image)
       if (!w(h("credits")).trim.isEmpty) i.addProperty(DCTerms.license,w(h("credits")))
       imageMap.put(w(h("image_id")),i)
@@ -152,7 +152,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     }}
     val resourceMap = new HashMap[String,Resource]
 //csv2rdf List(image_id, image_filename, creation_timestamp, creation_user, change_timestamp, change_user, thumbnail, display_order, credits)
-    wr = CSVReader("cofk_union_resource.csv")
+    wr = CSVReader("resource.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
@@ -171,7 +171,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       if (!w(h("resource_details")).trim.isEmpty) res.addProperty(DCTerms.license,w(h("resource_details")))
     }}
     val manifestationWorkMap = new HashMap[String,String]
-    wr = CSVReader("cofk_union_relationship.csv")
+    wr = CSVReader("relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val ind = h("relationship_type")
@@ -179,7 +179,7 @@ object EMLOCSV2RDF extends Anything2RDF {
     val riv = h("right_id_value")
     for (w <- wr)
         if (w(ind)=="cofk_union_relationship_type-is_manifestation_of") manifestationWorkMap.put(w(liv),w(riv))
-    wr = CSVReader("cofk_union_work.csv")
+    wr = CSVReader("work.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val workNameMap = new HashMap[String,String]
@@ -256,7 +256,7 @@ object EMLOCSV2RDF extends Anything2RDF {
  */
 
 //csv2rdf List(work_id, description, date_of_work_as_marked, original_calendar, date_of_work_std, date_of_work_std_gregorian, date_of_work_std_year, date_of_work_std_month, date_of_work_std_day, date_of_work2_std_year, date_of_work2_std_month, date_of_work2_std_day, date_of_work_std_is_range, date_of_work_inferred, date_of_work_uncertain, date_of_work_approx, authors_as_marked, addressees_as_marked, authors_inferred, authors_uncertain, addressees_inferred, addressees_uncertain, destination_as_marked, origin_as_marked, destination_inferred, destination_uncertain, origin_inferred, origin_uncertain, abstract, keywords, language_of_work, work_is_translation, incipit, explicit, ps, original_catalogue, accession_code, work_to_be_deleted, iwork_id, editors_notes, edit_status, relevant_to_cofk, creation_timestamp, creation_user, change_timestamp, change_user)
-    wr = CSVReader("cofk_union_manifestation.csv")
+    wr = CSVReader("manifestation.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val manifestationMap = new HashMap[String,Resource]
@@ -304,7 +304,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 //manifestation_creation_date_month, manifestation_creation_date_day, manifestation_creation_date_inferred,
 //manifestation_creation_date_uncertain, manifestation_creation_date_approx, manifestation_is_translation, language_of_manifestation,
 //address, manifestation_incipit, manifestation_excipit, manifestation_ps)
-    wr = CSVReader("cofk_union_location.csv")
+    wr = CSVReader("location.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val locationMap = new HashMap[String,Resource]()
@@ -335,7 +335,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       })
     }
 //csv2rdf List(location_id, location_name, latitude, longitude, creation_timestamp, creation_user, change_timestamp, change_user, location_synonyms, sent_count, recd_count, mentioned_count)*/
-    wr = CSVReader("cofk_union_institution.csv")
+    wr = CSVReader("institution.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
@@ -374,7 +374,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //csv2rdf List(institution_id, institution_name, institution_synonyms, institution_city, institution_city_synonyms, institution_country, institution_country_synonyms, creation_timestamp, creation_user, change_timestamp, change_user, document_count)
-    wr = CSVReader("cofk_union_person.csv")
+    wr = CSVReader("person.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     val personIdMap = new HashMap[String,Resource]
@@ -416,7 +416,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //csv2rdf List(person_id, foaf_name, skos_altlabel, skos_hiddenlabel, person_aliases, date_of_birth_year, date_of_birth_month, date_of_birth_day, date_of_birth, date_of_birth_inferred, date_of_birth_uncertain, date_of_birth_approx, date_of_death_year, date_of_death_month, date_of_death_day, date_of_death, date_of_death_inferred, date_of_death_uncertain, date_of_death_approx, gender, is_organisation, iperson_id, creation_timestamp, creation_user, change_timestamp, change_user, further_reading, sent_count, recd_count, mentioned_count)
-    wr = CSVReader("cofk_union_relationship.csv")
+    wr = CSVReader("relationship.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
@@ -434,7 +434,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //relationship_id,left_table_name,left_id_value,relationship_type,right_table_name,right_id_value,relationship_valid_from,relationship_valid_till,creation_timestamp,creation_user,change_timestamp,change_user
-    wr = CSVReader("cofk_union_relationship_type.csv")
+    /*wr = CSVReader("cofk_union_relationship_type.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
@@ -443,7 +443,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       p.addProperty(OWL.inverseOf,ip)
       ip.addProperty(OWL.inverseOf,p)
 
-    }}
+    }}*/
 //csv2rdf List(relationship_id, left_table_name, left_id_value, relationship_type, right_table_name, right_id_value, relationship_valid_from, relationship_valid_till, creation_timestamp, creation_user, change_timestamp, change_user)
     wr = CSVReader("pro_activity.csv")
     headers = wr.next
