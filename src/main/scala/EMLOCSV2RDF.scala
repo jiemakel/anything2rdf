@@ -434,7 +434,7 @@ object EMLOCSV2RDF extends Anything2RDF {
 
     }}
 //relationship_id,left_table_name,left_id_value,relationship_type,right_table_name,right_id_value,relationship_valid_from,relationship_valid_till,creation_timestamp,creation_user,change_timestamp,change_user
-    /*wr = CSVReader("cofk_union_relationship_type.csv")
+    wr = CSVReader("relationship_type.csv")
     headers = wr.next
     h = headers.zipWithIndex.toMap
     breakable { for (w <- wr) {
@@ -443,7 +443,7 @@ object EMLOCSV2RDF extends Anything2RDF {
       p.addProperty(OWL.inverseOf,ip)
       ip.addProperty(OWL.inverseOf,p)
 
-    }}*/
+    }}
 //csv2rdf List(relationship_id, left_table_name, left_id_value, relationship_type, right_table_name, right_id_value, relationship_valid_from, relationship_valid_till, creation_timestamp, creation_user, change_timestamp, change_user)
     wr = CSVReader("pro_activity.csv")
     headers = wr.next
